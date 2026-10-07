@@ -30,6 +30,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 - Add signed/unsigned SIMD floor-average source checks, baseline benchmarks,
   and a bounded decoded corpus census.
+- Add bounded AMD64 integer loop-state regressions with independent state/work
+  checks, native layout controls, and paired compile/execution benchmarks.
 - Add mixed-scalar host-call checks across nested memory, global, and table
   changes, including nested traps and repeated resolved calls.
 - Bind corpus child completion to loaded input identity and exact invocation
