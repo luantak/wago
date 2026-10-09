@@ -6,6 +6,18 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ## [Unreleased]
 
+### Changed
+
+- Speed up AMD64 constant division/remainder pairs, scalar selects, predicate
+  shifts, and contiguous SIMD byte shuffles.
+  ([#895](https://github.com/wago-org/wago/pull/895))
+- Use two SIMD lanes for admitted pure integer reduction loops on Linux AMD64
+  with SSE4.1, with scalar execution below 16 iterations and for rejected loops.
+  ([#895](https://github.com/wago-org/wago/pull/895))
+- Add opt-in pure integer select branches through `WAGO_AMD64_PURE_SELECT=1`;
+  keep them disabled by default because unpredictable conditions can regress.
+  ([#895](https://github.com/wago-org/wago/pull/895))
+
 ## [v0.1.0-beta.13] - 2026-10-15
 
 ### Changed
