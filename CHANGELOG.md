@@ -8,9 +8,13 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
-- Reduce ordinary and prepared numeric host-to-Wasm call overhead by combining
-  instance lifetime and invocation-gate admission, preserving close, revocation,
-  and waiter handoff behavior.
+- Admit exact typed i64 synchronous host callbacks to the private prepared
+  integer route when the bounded-work and detached-context proofs hold. Other
+  callback shapes retain their existing route; each synchronous host binding
+  grows by one function-value slot.
+- Reduce ordinary, prepared numeric, and synchronous numeric host-call entry
+  overhead by combining instance lifetime and invocation-gate admission,
+  preserving close, callback publication, revocation, and waiter handoff.
 - Bound AMD64 compiler scratch growth by recycling operand arenas at proven-empty
   instruction boundaries, tracking control-frame eligibility in constant time
   and clearing only pointer slots written since the previous cleanup.
@@ -26,13 +30,17 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 - Add an opt-in operand-aware native comparison diagnostic with bounded Wasm
   capture, source anchors, explicit opaque-byte coverage and focused test recipes.
-
+- Add signed/unsigned SIMD floor-average source checks, baseline benchmarks,
+  and a bounded decoded corpus census.
 - Add mixed-scalar host-call checks across nested memory, global, and table
   changes, including nested traps and repeated resolved calls.
 - Bind corpus child completion to loaded input identity and exact invocation
   evidence, with omitted-call and same-result substitution controls.
   
 ### Fixed
+
+- Read Bash completion output synchronously while preserving nested arguments,
+  candidate text, and file-completion fallback for empty results.
 
 - Report batched Wago and wazero execution benchmark allocations per operation,
   matching their timing units instead of reporting allocations per batch.
