@@ -2,7 +2,32 @@
 
 Use the experiment repository root. Requirements: Linux AMD64, Go 1.27.1, Python 3, `taskset`, GNU `objdump`, and `benchstat`. Use a CPU with SSE4.1 and AVX for the matched modern-mask measurements. The original run uses Ryzen 7 8845HS logical CPU 6. The script uses CPU 6 if available; otherwise it uses the first available CPU. It runs each version in serial, alternates their order, uses `GOMAXPROCS=1`, and excludes build time from benchmark time. Do not run other CPU-heavy work at the same time.
 
-The final hint reuse source is `d6bca7168c33a25f50e831140d1c8c39c98b78cf`. Use that commit or a documentation successor with matching source hashes. Create disposable baseline worktrees. The script copies the matched benchmark harness into them.
+The final small iteration is `c09376c7da085143d5a92a06429e3198eda87fdf`. It skips f64 memory-form analysis for qualified i32/f32 maps. Compare it against the previous hint build and the same pinned main with these commands. Each run also measures all six public whole-program cases.
+
+```bash
+git worktree add --detach /tmp/wago-map-iteration-before cf7b83f84
+git worktree add --detach /tmp/wago-map-iteration-main cea8f83f101fbdd0fcad634e9c7faad0377b676e
+python3 experiments/direct-simd-map/run.py final \
+  --baseline /tmp/wago-map-iteration-before --label reproduce-iteration-before \
+  --samples 6 --duration 1s \
+  --backend-regex '^BenchmarkDirectMap32ALUHints$' \
+  --backend-regex '^BenchmarkDirectMap32CompileHeap$/(i32|f32|rejected)$' \
+  --backend-regex '^BenchmarkDirectMap32Compile$/(false|true|alu)$'
+python3 experiments/direct-simd-map/run.py final \
+  --baseline /tmp/wago-map-iteration-main --label reproduce-iteration-main \
+  --samples 6 --duration 1s \
+  --backend-regex '^BenchmarkDirectMap32ALUHints$' \
+  --backend-regex '^BenchmarkDirectMap32CompileHeap$/(i32|f32|rejected)$' \
+  --backend-regex '^BenchmarkDirectMap32Compile$/(false|true|alu|rejected|existing-f64)$' \
+  --backend-regex '^BenchmarkDirectMap32Execute$/(false|true)$/8192$' \
+  --backend-regex '^BenchmarkDirectMap32YosysExecute$/8192$' \
+  --backend-regex '^BenchmarkLinearSumNoWrapAMD64$/8192$' \
+  --backend-regex '^BenchmarkCompileLinearSumAMD64$'
+```
+
+For local full tests, initialize `tests/conformance/spec-v3` and put the directory from `scripts/bootstrap-wabt.sh --print-path` first on `PATH`. The staged accounting tests require WABT 1.0.41. The system WABT 1.0.42 is rejected. The pinned spec interpreter is also required for complete staged coverage. CI prepares these tools on Linux AMD64.
+
+The earlier hint reuse source is `d6bca7168c33a25f50e831140d1c8c39c98b78cf`. Use that commit or a documentation successor with matching source hashes. Create disposable baseline worktrees. The script copies the matched benchmark harness into them.
 
 ```bash
 git worktree add --detach /tmp/wago-map-hints-main cea8f83f101fbdd0fcad634e9c7faad0377b676e

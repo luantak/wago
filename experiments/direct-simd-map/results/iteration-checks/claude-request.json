@@ -1,0 +1,18 @@
+[
+  "claude",
+  "--bare",
+  "-p",
+  "Independently review the changes from cf7b83f84 to HEAD for correctness, performance, benchmarks, and complex change risks. Read src/core/compiler/backend/railshot/amd64/vector_map_loop_emit.go, direct_map32.go, direct_map32_capacity.go, direct_map32*test.go, and experiments/direct-simd-map/results/iteration-checks/iteration.diff. Earlier raw benchmarks are under experiments/direct-simd-map/results/hints-final-main and hints-final-before. Require specific findings with file locations, evidence, risks, and suggested tests. Prioritize measurable gains, low allocations, and minimal regression risk. Remain read-only: no edits or shell execution. Do not assume recommendations in reports are correct.",
+  "--model",
+  "opus",
+  "--effort",
+  "high",
+  "--tools",
+  "Read,Glob,Grep",
+  "--disallowedTools",
+  "mcp__*",
+  "--permission-mode",
+  "dontAsk",
+  "--output-format",
+  "text"
+]

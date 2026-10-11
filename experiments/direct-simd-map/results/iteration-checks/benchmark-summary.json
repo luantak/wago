@@ -1,0 +1,682 @@
+{
+  "iteration-before": {
+    "main.txt": {
+      "BenchmarkDirectMap32ALUHints": {
+        "samples": 6,
+        "median_ns": 5035.5,
+        "bytes": [
+          32
+        ],
+        "allocs": [
+          1
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": 6,
+        "median_ns": 8833.0,
+        "bytes": [
+          13096
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": 6,
+        "median_ns": 8661.0,
+        "bytes": [
+          13096
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": 6,
+        "median_ns": 6972.0,
+        "bytes": [
+          12520
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": 6,
+        "median_ns": 17059.5,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": 6,
+        "median_ns": 16807.0,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": 6,
+        "median_ns": 27755.0,
+        "bytes": [
+          9456
+        ],
+        "allocs": [
+          11
+        ]
+      }
+    },
+    "candidate.txt": {
+      "BenchmarkDirectMap32ALUHints": {
+        "samples": 6,
+        "median_ns": 5056.0,
+        "bytes": [
+          32
+        ],
+        "allocs": [
+          1
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": 6,
+        "median_ns": 8787.0,
+        "bytes": [
+          13096
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": 6,
+        "median_ns": 8615.5,
+        "bytes": [
+          13096
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": 6,
+        "median_ns": 6983.5,
+        "bytes": [
+          12520
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": 6,
+        "median_ns": 16122.0,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": 6,
+        "median_ns": 16025.5,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": 6,
+        "median_ns": 27870.0,
+        "bytes": [
+          9456
+        ],
+        "allocs": [
+          11
+        ]
+      }
+    },
+    "main-whole.txt": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": 6,
+        "median_ns": 54482.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": 6,
+        "median_ns": 53659.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": 6,
+        "median_ns": 54814.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": 6,
+        "median_ns": 53460.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": 6,
+        "median_ns": 53682.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": 6,
+        "median_ns": 54149.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      }
+    },
+    "candidate-whole.txt": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": 6,
+        "median_ns": 53411.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": 6,
+        "median_ns": 53723.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": 6,
+        "median_ns": 56383.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": 6,
+        "median_ns": 53648.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": 6,
+        "median_ns": 53432.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": 6,
+        "median_ns": 56411.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      }
+    }
+  },
+  "iteration-main": {
+    "main.txt": {
+      "BenchmarkDirectMap32ALUHints": {
+        "samples": 6,
+        "median_ns": 4909.5,
+        "bytes": [
+          32
+        ],
+        "allocs": [
+          1
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": 6,
+        "median_ns": 7005.0,
+        "bytes": [
+          12488
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": 6,
+        "median_ns": 6887.0,
+        "bytes": [
+          12520
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": 6,
+        "median_ns": 6907.5,
+        "bytes": [
+          12520
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": 6,
+        "median_ns": 13347.0,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": 6,
+        "median_ns": 12987.0,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": 6,
+        "median_ns": 26585.5,
+        "bytes": [
+          9456
+        ],
+        "allocs": [
+          11
+        ]
+      },
+      "BenchmarkDirectMap32Compile/rejected": {
+        "samples": 6,
+        "median_ns": 13114.5,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/existing-f64": {
+        "samples": 6,
+        "median_ns": 111876.5,
+        "bytes": [
+          62816
+        ],
+        "allocs": [
+          81
+        ]
+      },
+      "BenchmarkDirectMap32Execute/false/8192": {
+        "samples": 6,
+        "median_ns": 5397.0,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkDirectMap32Execute/true/8192": {
+        "samples": 6,
+        "median_ns": 3941.0,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkDirectMap32YosysExecute/8192": {
+        "samples": 6,
+        "median_ns": 11143.0,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkLinearSumNoWrapAMD64/8192": {
+        "samples": 6,
+        "median_ns": 953.75,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkCompileLinearSumAMD64": {
+        "samples": 6,
+        "median_ns": 12304.0,
+        "bytes": [
+          11048
+        ],
+        "allocs": [
+          27
+        ]
+      }
+    },
+    "candidate.txt": {
+      "BenchmarkDirectMap32ALUHints": {
+        "samples": 6,
+        "median_ns": 5019.5,
+        "bytes": [
+          32
+        ],
+        "allocs": [
+          1
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": 6,
+        "median_ns": 8790.0,
+        "bytes": [
+          13096
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": 6,
+        "median_ns": 8824.5,
+        "bytes": [
+          13096
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": 6,
+        "median_ns": 6886.0,
+        "bytes": [
+          12520
+        ],
+        "allocs": [
+          30
+        ]
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": 6,
+        "median_ns": 15437.5,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": 6,
+        "median_ns": 15252.5,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": 6,
+        "median_ns": 27381.5,
+        "bytes": [
+          9456
+        ],
+        "allocs": [
+          11
+        ]
+      },
+      "BenchmarkDirectMap32Compile/rejected": {
+        "samples": 6,
+        "median_ns": 13256.0,
+        "bytes": [
+          12072
+        ],
+        "allocs": [
+          29
+        ]
+      },
+      "BenchmarkDirectMap32Compile/existing-f64": {
+        "samples": 6,
+        "median_ns": 111921.0,
+        "bytes": [
+          62816
+        ],
+        "allocs": [
+          81
+        ]
+      },
+      "BenchmarkDirectMap32Execute/false/8192": {
+        "samples": 6,
+        "median_ns": 560.3,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkDirectMap32Execute/true/8192": {
+        "samples": 6,
+        "median_ns": 914.25,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkDirectMap32YosysExecute/8192": {
+        "samples": 6,
+        "median_ns": 1831.0,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkLinearSumNoWrapAMD64/8192": {
+        "samples": 6,
+        "median_ns": 935.15,
+        "bytes": [
+          0
+        ],
+        "allocs": [
+          0
+        ]
+      },
+      "BenchmarkCompileLinearSumAMD64": {
+        "samples": 6,
+        "median_ns": 11515.5,
+        "bytes": [
+          11048
+        ],
+        "allocs": [
+          27
+        ]
+      }
+    },
+    "main-whole.txt": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": 6,
+        "median_ns": 46046.5,
+        "bytes": [
+          22465
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": 6,
+        "median_ns": 45723.0,
+        "bytes": [
+          22465
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": 6,
+        "median_ns": 50957.5,
+        "bytes": [
+          22465
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": 6,
+        "median_ns": 46228.0,
+        "bytes": [
+          22497
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": 6,
+        "median_ns": 46514.0,
+        "bytes": [
+          22497
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": 6,
+        "median_ns": 49406.0,
+        "bytes": [
+          22497
+        ],
+        "allocs": [
+          104
+        ]
+      }
+    },
+    "candidate-whole.txt": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": 6,
+        "median_ns": 52940.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": 6,
+        "median_ns": 52308.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": 6,
+        "median_ns": 53063.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": 6,
+        "median_ns": 52448.0,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": 6,
+        "median_ns": 53160.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": 6,
+        "median_ns": 52933.5,
+        "bytes": [
+          23073
+        ],
+        "allocs": [
+          104
+        ]
+      }
+    }
+  }
+}

@@ -1,5 +1,17 @@
 # Independent reviews
 
+## Final small iteration
+
+Source: `c09376c7d`. GPT-6 Astra independently reviewed correctness and GPT-6.1 Sol independently reviewed performance. Both stayed read-only. The author verified their findings against source and raw results.
+
+The correctness review confirmed that qualified i32/f32 maps cannot use the f64 forms handled by `memoryForms`. Skipping that analysis leaves the same zero arrays and does not change native emission. It found a P2 Windows test-resource issue: eight cases retained sixteen 4 GiB committed mappings. The test now excludes Windows and uses sequential subtests to release each pair promptly. The reviewer confirmed the fix. Other map tests remain enabled on Windows and macOS. Both test binaries cross-compile successfully.
+
+The performance reviewer recommends **KEEP for the PR under the user's execution-first priority**. It verified 14 backend and six public main-comparison cases, and seven backend and six public previous-version cases, with six samples per row. Source, input, harness, baseline production and current final binary hashes match. All seven native/input artifact hashes match the prior hint build. The previous baseline backend binary had been replaced by the main run; its saved runner hash remains, while candidate and API hashes were independently checked before replacement.
+
+Main execution improves 89.62% for i32, 76.80% for f32 and 83.57% for the original Yosys routine at 8,192 elements (all p=0.002). Residual costs are explicit: mapped compilation +15.66%/+17.44%, heap compilation +25.48%/+28.13%, ALU compilation +2.99%, and isolated ALU hints +2.24%. Public f32 one-call cost rises 7.14–14.29%. No whole-application gain is established. Allocation counts remain unchanged; accepted heap/public bytes remain +608 i32 / +576 f32 versus main. The final skip proves no incremental timing gain against `cf7b83f84`; all samples, including the shared high candidate round, are retained. The report carries these limits into KEEP.
+
+Claude Code was attempted from the repository root with the exact read-only command and an unbiased request for file locations, evidence, risks and suggested tests. It exited 1 with `Not logged in · Please run /login`. No Claude review occurred. Request, output, source diff, local verification and native comparisons are retained in `results/iteration-checks/`.
+
 ## Hint reuse follow-up
 
 Final source: `d6bca7168`. Baselines: main `cea8f83f1` and previous capacity `1ca658021`. GPT-6 Astra reviewed correctness in an independent context. GPT-6.1 Sol reviewed performance in an independent context. Both used actual source, tests, diffs and evidence, stayed read-only, and ran no CPU-heavy work during timings. The author checked their findings.

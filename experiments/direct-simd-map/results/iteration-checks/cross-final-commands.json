@@ -1,0 +1,26 @@
+[
+  {
+    "command": [
+      "go",
+      "test",
+      "-c",
+      "-o",
+      "/tmp/direct-map32-windows.test",
+      "./src/core/compiler/backend/railshot/amd64"
+    ],
+    "GOOS": "windows",
+    "exit": 0
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "-c",
+      "-o",
+      "/tmp/direct-map32-darwin.test",
+      "./src/core/compiler/backend/railshot/amd64"
+    ],
+    "GOOS": "darwin",
+    "exit": 0
+  }
+]

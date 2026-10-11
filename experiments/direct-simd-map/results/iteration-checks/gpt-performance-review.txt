@@ -1,0 +1,17 @@
+Independent GPT-6.1 Sol performance review, read-only.
+
+KEEP for the PR under the user's execution-first priority. Large execution gains and residual compile costs are both measured. The small memoryForms skip has no proved incremental timing gain.
+
+Source: qualifyMap32 runs before the new branch. It permits i32/f32 data operations, while memoryForms folds f64 operations. Its former output is zero for these maps. Non-map plans retain the existing analysis. All seven native/input artifact hashes independently match the prior hint build.
+
+Main comparison: i32 execution -89.62%, f32 -76.80%, original Yosys routine -83.57% at 8192 elements, all p=0.002. Mapped compile +15.66%/+17.44%; heap compile +25.48%/+28.13%; all p=0.002. ALU compile +2.99% p=0.004; isolated hint scan +2.24% p=0.041. The ALU fixture has no loop; the remaining shared shape check at hints.go:1309 is consistent with this cost. The new emitter skip cannot fix that path.
+
+Public f32 compile-instantiate-invoke-close rises 13.46%, 14.29%, 7.14% for counts 0,16,8192 (p=0.002,0.002,0.009). Public i32 is inconclusive. Rejected compile, existing f64 and linear-sum controls show no proved difference; equal timing is not established. No whole-Yosys or one-call public gain is claimed.
+
+No allocation counts added. Execution 0 B/op /0 allocations. Accepted heap 13096 B/op /30; public 23073 B/op /104. Heap/public bytes versus main +608 i32 /+576 f32. Every byte and count matches cf7b83f84.
+
+Previous-build comparison: backend p>=0.485, public p>=0.310; no timing gain or equality proved. Candidate round two has shared high samples, including rejected/ALU controls: f32 heap92.151us versus about8.5-8.7us elsewhere. Retain all samples.
+
+Verified six samples for each of14 backend+6 public main cases and7 backend+6 public prior cases. Source/input/harness hashes and baseline production hashes match. All four final-main binary hashes match. Prior-run candidate/API hashes matched before overwrite; prior main.test had already been replaced by the final-main build, so only its recorded runner hash remains. Main process snapshot shows independent Git activity near build start; this is not a reason to discard samples.
+
+No additional test required for this small skip by this review. Keep f64, allocation and native-hash checks. A later compile-cost follow-up should target the shared hint path and report the measured regressions.

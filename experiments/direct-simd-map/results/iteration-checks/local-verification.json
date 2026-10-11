@@ -1,0 +1,66 @@
+{
+  "source": "c09376c7da085143d5a92a06429e3198eda87fdf",
+  "full_suite_initial_issue": "missing spec-v3 submodule",
+  "full_suite_staged_issue": "system WABT 1.0.42 rejected; pinned 1.0.41 required",
+  "ordinary_failed_packages": [
+    "FAIL\tgithub.com/wago-org/wago/src/wago\t12.561s"
+  ],
+  "checked_failed_packages": [
+    "FAIL\tgithub.com/wago-org/wago/src/wago\t12.741s"
+  ],
+  "affected_package_reruns": [
+    {
+      "file": "api-pinned.txt",
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "./src/wago"
+      ],
+      "exit": 0,
+      "wabt": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/.tools/wabt-1.0.41-linux-x64/bin/wast2json"
+    },
+    {
+      "file": "api-checked-pinned.txt",
+      "command": [
+        "go",
+        "test",
+        "-tags=wago_regalloccheck",
+        "-count=1",
+        "./src/wago"
+      ],
+      "exit": 0,
+      "wabt": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/.tools/wabt-1.0.41-linux-x64/bin/wast2json"
+    }
+  ],
+  "other_full_suite_packages": "passed",
+  "bench_checked_exit": 0,
+  "staticcheck_exit": 0,
+  "focused_final_exit": 0,
+  "windows_and_darwin_test_builds": [
+    {
+      "command": [
+        "go",
+        "test",
+        "-c",
+        "-o",
+        "/tmp/direct-map32-windows.test",
+        "./src/core/compiler/backend/railshot/amd64"
+      ],
+      "GOOS": "windows",
+      "exit": 0
+    },
+    {
+      "command": [
+        "go",
+        "test",
+        "-c",
+        "-o",
+        "/tmp/direct-map32-darwin.test",
+        "./src/core/compiler/backend/railshot/amd64"
+      ],
+      "GOOS": "darwin",
+      "exit": 0
+    }
+  ]
+}

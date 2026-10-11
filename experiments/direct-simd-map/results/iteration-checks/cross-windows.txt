@@ -1,0 +1,2 @@
+# github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64 [github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.test]
+src/core/compiler/backend/railshot/amd64/direct_map32_edges_test.go:6:2: "bytes" imported and not used

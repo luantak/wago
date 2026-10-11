@@ -1,0 +1,25 @@
+[
+  {
+    "file": "api-pinned.txt",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "./src/wago"
+    ],
+    "exit": 0,
+    "wabt": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/.tools/wabt-1.0.41-linux-x64/bin/wast2json"
+  },
+  {
+    "file": "api-checked-pinned.txt",
+    "command": [
+      "go",
+      "test",
+      "-tags=wago_regalloccheck",
+      "-count=1",
+      "./src/wago"
+    ],
+    "exit": 0,
+    "wabt": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/.tools/wabt-1.0.41-linux-x64/bin/wast2json"
+  }
+]
