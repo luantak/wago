@@ -1,2 +1,0 @@
-From https://github.com/wago-org/wago
- * branch                main       -> FETCH_HEAD

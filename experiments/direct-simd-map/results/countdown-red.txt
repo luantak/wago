@@ -1,5 +1,0 @@
---- FAIL: TestDirectMap32Countdown (0.00s)
-    direct_map32_test.go:231: countdown map not selected map[br-pair-fold:1 cmp-branch-fuse:1 compact-i32-frame:1 compact-loop-align32:1 counted-loop-latch:1 entry-arg-local-pin:1 frame-header-elide:1 late-frame-commute:1 tree-order:2 tree-order-candidate:2]
-FAIL
-FAIL	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	0.003s
-FAIL

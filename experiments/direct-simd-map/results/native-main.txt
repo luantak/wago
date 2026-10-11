@@ -1,9 +1,0 @@
-=== RUN   TestDirectMap32RealNative
-    direct_map32_edges_test.go:230: module=/home/jtenner/.codex/worktrees/direct-simd-map/wago/corpus/workloads/applications/yosys/yosys.wasm bytes=50196743 selections=0
---- PASS: TestDirectMap32RealNative (1.10s)
-=== RUN   TestDirectMap32Artifacts
-    direct_map32_test.go:242: fp=false module=246 function=246 frame=56 spills=0 reloads=0 selected=0
-    direct_map32_test.go:242: fp=true module=258 function=258 frame=56 spills=0 reloads=0 selected=0
---- PASS: TestDirectMap32Artifacts (0.00s)
-PASS
-ok  	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	1.104s

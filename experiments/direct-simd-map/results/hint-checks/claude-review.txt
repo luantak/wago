@@ -1,3 +1,0 @@
-Not logged in · Please run /login
-
-exit_code=1

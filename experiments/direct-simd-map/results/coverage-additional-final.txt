@@ -1,7 +1,0 @@
-=== RUN   TestDirectMap32Corpus
-    direct_map32_corpus_test.go:144: /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/downloads/cmsis-scale-O2.wasm functions=5 loops=2 plans=0 near=2 error=
-    direct_map32_corpus_test.go:144: /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/downloads/cmsis-scale-Oz.wasm functions=5 loops=1 plans=0 near=1 error=
-    direct_map32_corpus_test.go:144: /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/downloads/duckdb-mvp-1.32.0.wasm functions=62171 loops=58874 plans=0 near=1067 error=
---- PASS: TestDirectMap32Corpus (0.28s)
-PASS
-ok  	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	0.284s

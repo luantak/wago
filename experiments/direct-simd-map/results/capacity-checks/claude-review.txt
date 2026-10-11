@@ -1,3 +1,0 @@
-Not logged in · Please run /login
-
-Exit status: 1

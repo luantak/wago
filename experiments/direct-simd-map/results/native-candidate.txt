@@ -1,6 +1,0 @@
-=== RUN   TestDirectMap32Artifacts
-    direct_map32_test.go:226: fp=false module=765 stats=[0x1eba14cf0008]
-    direct_map32_test.go:226: fp=true module=753 stats=[0x1eba14cf0408]
---- PASS: TestDirectMap32Artifacts (0.00s)
-PASS
-ok  	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	0.005s

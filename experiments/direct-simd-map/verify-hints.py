@@ -9,6 +9,7 @@ import subprocess
 root = Path(__file__).resolve().parents[2]
 lab = root / 'experiments/direct-simd-map'
 out = lab / 'results/hint-checks'
+out.mkdir(parents=True, exist_ok=True)
 backend = 'src/core/compiler/backend/railshot/amd64'
 env = dict(os.environ, GOFLAGS='-buildvcs=false', GOMAXPROCS='1')
 commands = []

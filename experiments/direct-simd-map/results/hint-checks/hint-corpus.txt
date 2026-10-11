@@ -1,5 +1,0 @@
-=== RUN   TestDirectMap32HintCorpus
-    direct_map32_hint_corpus_test.go:124: modules=121 functions=220624 hinted-functions=10 hints=21 reserve-before-module-cap=10752 full-static-plans-in-hinted-functions=3
---- PASS: TestDirectMap32HintCorpus (1.35s)
-PASS
-ok  	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	1.357s

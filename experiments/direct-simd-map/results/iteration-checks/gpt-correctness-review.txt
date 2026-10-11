@@ -1,7 +1,0 @@
-Independent GPT-6 Astra review of the final iteration, read-only. No builds or tests run by reviewer.
-
-Production review: qualifyMap32 permits one four-byte load and the exact i32/f32 multiply/add event sequence. It rejects the f64 loads and arithmetic required by memoryForms. The new branch retains the same zero-valued arrays returned by the old analysis. The skipped analysis has no emission side effects. Scalar-tail home checks, guards, and bodyMap32(checkedBody) remain unchanged.
-
-P2 finding: broadening the full-memory test to Windows could retain about 64 GiB of committed memory. Each of eight cases created two 4 GiB JobMemory objects with cleanup registered on the outer test. Windows mmapRWReserve uses MEM_RESERVE|MEM_COMMIT. The author verified the allocation path.
-
-Final review: resolved. direct_map32_full_memory_test.go excludes Windows. Each case runs in a sequential subtest, whose cleanup releases both mappings before the next case. Other map tests remain enabled on Windows. No new concerns.

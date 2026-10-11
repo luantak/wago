@@ -30,6 +30,12 @@ env = dict(os.environ, GOMAXPROCS="1", GOFLAGS="-buildvcs=false",
            DIRECT_MAP32_INPUTS=str(lab / "results/native-candidate"))
 cpu = min(set(os.sched_getaffinity(0)) & {6}) if 6 in os.sched_getaffinity(0) else min(os.sched_getaffinity(0))
 
+# Generate the public benchmark inputs before any timed measurements.
+inputs = Path(env["DIRECT_MAP32_INPUTS"])
+inputs.mkdir(parents=True, exist_ok=True)
+subprocess.run(["go", "test", "-count=1", "-run", "^TestDirectMap32Artifacts$", "./" + backend],
+               cwd=root, env=dict(env, DIRECT_MAP32_ARTIFACTS=str(inputs)), check=True)
+
 def build(directory, kind, dest):
     pkg = backend if kind == "backend" else "src/wago"
     subprocess.run(["go", "test", "-c", "-o", str(dest), "./" + pkg],
