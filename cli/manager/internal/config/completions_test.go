@@ -84,6 +84,12 @@ func TestInstalledZshCompletionCanBeSourced(t *testing.T) {
 
 func TestBashCompletionPassesNestedCommandWords(t *testing.T) {
 	bash, err := exec.LookPath("bash")
+	if selected := os.Getenv("WAGO_DIAG_BASH"); selected != "" {
+		bash, err = exec.LookPath(selected)
+		if err != nil {
+			t.Fatalf("diagnostic Bash %q: %v", selected, err)
+		}
+	}
 	if err != nil {
 		t.Skip("bash is not installed")
 	}
@@ -97,8 +103,17 @@ func TestBashCompletionPassesNestedCommandWords(t *testing.T) {
 	if err := os.WriteFile(path, []byte(script), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command(bash, "--noprofile", "--norc", "-c", `. "$1"; COMP_WORDS=(wago version ""); COMP_CWORD=2; _wago_complete; printf '%s\n' "${COMPREPLY[@]}"`, "_", path)
+	trace := ""
+	marker := filepath.Join(root, "bash-trace.txt")
+	if os.Getenv("WAGO_DIAG_TRACE") == "1" {
+		trace = `exec 9> "$WAGO_DIAG_MARKER"; BASH_XTRACEFD=9; set -x; `
+		t.Cleanup(func() { data, err := os.ReadFile(marker); t.Logf("Bash trace (%s), read=%v:\n%s", bash, err, data) })
+	}
+	command := exec.Command(bash, "--noprofile", "--norc", "-c", trace+`. "$1"; COMP_WORDS=(wago version ""); COMP_CWORD=2; _wago_complete; printf '%s\n' "${COMPREPLY[@]}"`, "_", path)
 	command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "WAGO_COMPLETION_TEST_HELPER=1")
+	if trace != "" {
+		command.Env = append(command.Env, "WAGO_DIAG_MARKER="+marker)
+	}
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("bash nested completion (%s): %v\n%s", bash, err, output)
