@@ -11,7 +11,7 @@ permissions:
 jobs:
   shell-probes:
     runs-on: windows-11-arm
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -34,3 +34,22 @@ jobs:
         if: always()
         shell: pwsh
         run: go test -v -count=10 -tags=wago_regalloccheck -run 'Completion' ./cli/manager/internal/config
+      - name: Observe unchanged Bash test in fresh native Go processes
+        if: always()
+        shell: pwsh
+        run: |
+          $failed = 0
+          for ($observation = 1; $observation -le 50; $observation++) {
+            Write-Output "Fresh native Go parent observation $observation"
+            & .tmp/completion-helper/wago.exe -test.v -test.timeout=20s -test.run '^TestBashCompletionPassesNestedCommandWords$'
+            if ($LASTEXITCODE -ne 0) { $failed++ }
+          }
+          Write-Output "Failed fresh-process observations: $failed"
+          if ($failed -ne 0) { exit 1 }
+      - name: Record available shell fault events
+        if: always()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001; StartTime=(Get-Date).AddHours(-2)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match '(?im)^\s*(Faulting application name|P1):\s*(bash|sh|wago)\.exe(?:,|\s|$)' } |
+            Select-Object TimeCreated, Id, Message | Format-List
