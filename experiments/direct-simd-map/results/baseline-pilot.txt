@@ -1,0 +1,41 @@
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	    8953	     13933 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   10000	     14434 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/small         	   16555	      7676 ns/op	    8687 B/op	      22 allocs/op
+BenchmarkDirectMap32Compile/control       	   12967	      9130 ns/op	   10544 B/op	      21 allocs/op
+BenchmarkDirectMap32Compile/alu           	    5252	     26053 ns/op	    9549 B/op	      11 allocs/op
+BenchmarkDirectMap32Compile/simd          	   10000	     11243 ns/op	   12379 B/op	      24 allocs/op
+BenchmarkDirectMap32Execute/false/0       	 5653515	        21.23 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/1       	 5563585	        21.70 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/3       	 5409146	        22.27 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/4       	 5278142	        22.72 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/7       	 4956638	        24.17 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/8       	 4870293	        24.76 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/9       	 4755330	        25.24 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/15      	 4152712	        28.88 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/16      	 4064740	        29.62 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/17      	 3976786	        30.19 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/31      	 3099458	        39.13 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/32      	 3044071	        39.50 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/33      	 2993352	        39.99 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/512     	  343531	       350.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/false/8192    	   22639	      5482 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/0        	 5677395	        21.22 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/1        	 5582007	        22.08 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/3        	 5519437	        21.97 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/4        	 5417820	        23.27 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/7        	 4961972	        24.05 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8        	 5000949	        24.72 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/9        	 4659765	        24.61 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/15       	 4291564	        27.81 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/16       	 4235343	        28.67 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/17       	 4269432	        28.50 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/31       	 3399006	        35.98 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/32       	 3162102	        37.80 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/33       	 3334204	        36.07 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/512      	  454798	       268.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192     	   30518	      3900 ns/op	       0 B/op	       0 allocs/op
+PASS
