@@ -119,7 +119,6 @@ jobs:
             throw 'ProcDump signature is not valid Microsoft Authenticode.'
           }
           Write-Output "ProcDump version: $((Get-Item $captureTool).VersionInfo.FileVersion)"
-          & $captureTool '-accepteula' '-?'
           "WAGO_PROCDUMP=$captureTool" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Install wabt (Windows)
         shell: pwsh

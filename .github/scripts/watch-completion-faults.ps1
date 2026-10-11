@@ -18,6 +18,7 @@ function Start-CaptureProcess([string[]]$Arguments) {
   $start.UseShellExecute = $false
   $start.RedirectStandardOutput = $true
   $start.RedirectStandardError = $true
+  $start.StandardOutputEncoding = [System.Text.Encoding]::Unicode
   foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
   $process = [System.Diagnostics.Process]::Start($start)
   return [pscustomobject]@{
