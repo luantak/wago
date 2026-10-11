@@ -130,6 +130,9 @@ func (e *regionLoopEmitter) rangeCheck(s *regionMemoryStream) {
 func (e *regionLoopEmitter) guards() {
 	f, p := e.f, e.p
 	a, b := e.gp[0], e.gp[1]
+	if p.map32 {
+		e.map32EarlyCount()
+	}
 	for i, l := range p.locals[:p.localN] {
 		d := f.locals[l.index]
 		switch {
@@ -150,37 +153,35 @@ func (e *regionLoopEmitter) guards() {
 		}
 		f.a.Store64(RSP, e.off(i), a)
 	}
-	e.affine(p.limit, a, b)
-	f.a.Load32(b, RSP, e.off(int(p.counter)))
-	if p.zeroTerminated {
-		// finish proves the limit is literal zero and the positive step is a
-		// power of two. Modular distance to zero gives the first terminating
-		// iteration iff it is nonzero and divisible by that step. Zero entry
-		// remains in the original do-while loop (it may execute 2^32 steps).
-		f.a.TestSelf(b, false)
-		e.fail(condE)
-	} else {
-		f.a.Cmp32(a, b)
-		e.fail(condBE)
+	if !p.map32 {
+		e.affine(p.limit, a, b)
+		f.a.Load32(b, RSP, e.off(int(p.counter)))
+		if p.zeroTerminated {
+			// finish proves the limit is literal zero and the positive step is a
+			// power of two. Modular distance to zero gives the first terminating
+			// iteration iff it is nonzero and divisible by that step. Zero entry
+			// remains in the original do-while loop (it may execute 2^32 steps).
+			f.a.TestSelf(b, false)
+			e.fail(condE)
+		} else {
+			f.a.Cmp32(a, b)
+			e.fail(condBE)
+		}
+		f.a.Sub32(a, b)
+		step := p.locals[p.counter].step
+		if step != 1 {
+			f.a.TestImm(a, step-1, false)
+			e.fail(condNE)
+			f.a.ShiftImm(5, a, uint8(bits.TrailingZeros32(step)), false)
+		}
+		// The two-lane path requires complete pairs. Wide groups instead leave
+		// zero to three iterations for the original checked body.
+		if !p.adjacent && !p.scalar && !p.wide && !p.map32 {
+			f.a.TestImm(a, 1, false)
+			e.fail(condNE)
+		}
+		f.a.Store64(RSP, e.off(8), a)
 	}
-	f.a.Sub32(a, b)
-	step := p.locals[p.counter].step
-	if step != 1 {
-		f.a.TestImm(a, step-1, false)
-		e.fail(condNE)
-		f.a.ShiftImm(5, a, uint8(bits.TrailingZeros32(step)), false)
-	}
-	// The two-lane path requires complete pairs. Wide groups instead leave
-	// zero to three iterations for the original checked body.
-	if !p.adjacent && !p.scalar && !p.wide && !p.map32 {
-		f.a.TestImm(a, 1, false)
-		e.fail(condNE)
-	}
-	if p.map32 {
-		f.a.AluRI(7, a, map32MinCount, false)
-		e.fail(condB)
-	}
-	f.a.Store64(RSP, e.off(8), a)
 	for _, l := range p.loads[:p.loadN] {
 		n := p.nodes[l.node]
 		e.loadStream[l.node] = e.stream(n.left, n.bits)
@@ -786,7 +787,7 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 			return false, nil
 		}
 	}
-	p.wide = f.cpuHas(shared.AMD64AVX) && ((regionWideAdjacentEnabled && p.adjacent) || (regionWideIndependentEnabled && !p.adjacent && !p.scalar))
+	p.wide = !p.map32 && f.cpuHas(shared.AMD64AVX) && ((regionWideAdjacentEnabled && p.adjacent) || (regionWideIndependentEnabled && !p.adjacent && !p.scalar))
 	if p.adjacent && regionAdjacentMultiEnabled && !p.contiguousAdjacentIterations() {
 		p.wide = false
 	}
@@ -812,7 +813,7 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	if !p.map32 {
 		need = p.scratchNeedPermanent(folded, permanent)
 	}
-	if step&(step-1) != 0 || need > 10 {
+	if (!p.map32 && step&(step-1) != 0) || need > 10 {
 		return false, nil
 	}
 	prefixDepth := f.depth()
@@ -850,10 +851,10 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	if p.wide {
 		slots += 3
 	}
-	e.slot = f.allocSpillSlots(slots)
-	e.guards()
-	e.aliasGuards()
 	if !p.map32 {
+		e.slot = f.allocSpillSlots(slots)
+		e.guards()
+		e.aliasGuards()
 		e.coalesceStreams()
 	}
 	toFast := f.a.JmpPlaceholder()
@@ -928,7 +929,16 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 		valid = false
 	}
 	if valid {
-		if !p.map32 {
+		if p.map32 {
+			// Qualify the scalar exit before adding any private slots or guards.
+			// Matching homes let these guards read the original entry image.
+			e.slot = f.allocSpillSlots(slots)
+			e.guards()
+			e.aliasGuards()
+			for _, site := range e.fails[:e.failN] {
+				f.a.PatchRel32(site, fallback)
+			}
+		} else {
 			e.prepareRegisterStreams(&entry)
 		}
 		if e.allCached {

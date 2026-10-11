@@ -15,21 +15,46 @@ func (p *regionLoopPlan) map32Float(id uint8) bool {
 }
 
 func (p *regionLoopPlan) qualifyMap32() bool {
-	if p.storeN != 1 || p.loadN != 1 || p.loads[0].bytes != 4 || p.loads[0].stride != 4 || p.stride(p.stores[0].address) != 4 || p.zeroTerminated {
+	if p.zeroTerminated {
+		if p.locals[p.counter].step != 0xffffffff || p.nodes[p.limit].bits != 0 || p.nodes[p.limit].uses != 0 || p.headerCount != 0 && p.headerCount != p.counter+1 {
+			return false
+		}
+	} else {
+		if p.nodes[p.limit].op != 0 || p.nodes[p.limit].bits != 0 {
+			return false
+		}
+		limitInputs := 0
+		for _, c := range p.nodes[p.limit].coeff {
+			if c != 0 {
+				if c != 1 {
+					return false
+				}
+				limitInputs++
+			}
+		}
+		if limitInputs != 1 {
+			return false
+		}
+	}
+	if p.storeN != 1 || p.loadN != 1 || p.loads[0].bytes != 4 || p.loads[0].stride != 4 || p.stride(p.stores[0].address) != 4 {
 		return false
 	}
 	value := p.stores[0].value
 	add := p.nodes[value]
-	mul := p.nodes[add.left]
+	mulID := add.left
+	if add.op == 0x94 || add.op == 0x6c {
+		mulID = value
+	}
+	mul := p.nodes[mulID]
 	fp := p.nodes[p.loads[0].node].op == 0x2a
 	if fp {
-		if add.op != 0x92 || mul.op != 0x94 {
+		if (add.op != 0x92 && add.op != 0x94) || mul.op != 0x94 {
 			return false
 		}
-	} else if add.op != 0x6a || mul.op != 0x6c {
+	} else if (add.op != 0x6a && add.op != 0x6c) || mul.op != 0x6c {
 		return false
 	}
-	if mul.left != p.loads[0].node || !p.map32Invariant(mul.right, fp) || !p.map32Invariant(add.right, fp) {
+	if mul.left != p.loads[0].node || !p.map32Invariant(mul.right, fp) || (mulID != value && !p.map32Invariant(add.right, fp)) {
 		return false
 	}
 	for i, l := range p.locals[:p.localN] {
@@ -54,7 +79,10 @@ func (p *regionLoopPlan) qualifyMap32() bool {
 		events[n] = ev
 		n++
 	}
-	return n == 4 && events == [4]uint8{p.loads[0].node, add.left, value, 0x80}
+	if mulID == value {
+		return n == 3 && events == [4]uint8{p.loads[0].node, value, 0x80, 0}
+	}
+	return n == 4 && events == [4]uint8{p.loads[0].node, mulID, value, 0x80}
 }
 
 func (p *regionLoopPlan) map32Invariant(id uint8, fp bool) bool {
@@ -94,10 +122,16 @@ func (e *regionLoopEmitter) broadcastMap32(id uint8, reg Reg) {
 
 func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	f, p := e.f, e.p
+	oldPC := f.wasmPC
 	add := p.nodes[p.stores[0].value]
 	mul := p.nodes[add.left]
+	if add.op == 0x94 || add.op == 0x6c {
+		mul = add
+	}
 	e.broadcastMap32(mul.right, e.fp[1])
-	e.broadcastMap32(add.right, e.fp[2])
+	if add.op == 0x92 || add.op == 0x6a {
+		e.broadcastMap32(add.right, e.fp[2])
+	}
 	f.a.Load64(e.gp[0], RSP, e.off(9+int(e.storeStream[0])))
 	f.a.Load64(e.gp[1], RSP, e.off(9+int(e.loadStream[p.loads[0].node])))
 	f.a.Load32(e.gp[2], RSP, e.off(8))
@@ -105,15 +139,35 @@ func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	f.a.Store32(RSP, e.off(8), e.gp[2]) // complete scalar iterations
 	f.a.ShiftImm(5, e.gp[2], 2, false)
 	top := f.a.Len()
+	f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
+	previous := f.enterProfileInstruction()
 	f.mov128LoadIdx(e.fp[0], RBX, e.gp[1], 0)
+	f.switchProfileOrigin(previous)
+	f.wasmPC = f.tracePCBase + mul.pos
+	previous = f.enterProfileInstruction()
 	if p.nodes[p.loads[0].node].op == 0x2a {
 		f.a.SseRR(0, 0x59, e.fp[0], e.fp[1], false)
-		f.a.SseRR(0, 0x58, e.fp[0], e.fp[2], false)
+		f.switchProfileOrigin(previous)
+		f.wasmPC = f.tracePCBase + add.pos
+		previous = f.enterProfileInstruction()
+		if add.op == 0x92 {
+			f.a.SseRR(0, 0x58, e.fp[0], e.fp[2], false)
+		}
 	} else {
 		f.a.SseMapRR(0x66, 0x38, 0x40, e.fp[0], e.fp[1]) // SSE4.1 PMULLD
-		f.a.SseRR(0x66, 0xfe, e.fp[0], e.fp[2], false)
+		f.switchProfileOrigin(previous)
+		f.wasmPC = f.tracePCBase + add.pos
+		previous = f.enterProfileInstruction()
+		if add.op == 0x6a {
+			f.a.SseRR(0x66, 0xfe, e.fp[0], e.fp[2], false)
+		}
 	}
+	f.switchProfileOrigin(previous)
+	f.wasmPC = f.tracePCBase + p.stores[0].pos
+	previous = f.enterProfileInstruction()
 	f.mov128StoreIdx(RBX, e.gp[0], e.fp[0], 0)
+	f.switchProfileOrigin(previous)
+	f.wasmPC = oldPC
 	f.a.AluRI(aluTable[opAdd].digit, e.gp[0], 16, true)
 	f.a.AluRI(aluTable[opAdd].digit, e.gp[1], 16, true)
 	f.a.AluRI(aluTable[opSub].digit, e.gp[2], 1, false)
@@ -162,4 +216,50 @@ func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	f.a.Cmp32(e.gp[0], e.gp[1])
 	f.a.PatchRel32(f.a.JccPlaceholder(condNE), checkedTail)
 	f.stats.peep("region-loop-map32")
+}
+
+// Test the trip count before copying local homes or constructing ranges.
+func (e *regionLoopEmitter) map32EntryInteger(i int, reg Reg) {
+	f := e.f
+	d := f.locals[e.p.locals[i].index]
+	if d.state == lsConstZero {
+		f.a.Xor32(reg, reg)
+	} else if d.reg != regNone && d.state != lsMem {
+		f.a.MovRegReg32(reg, d.reg)
+	} else {
+		f.a.Load32(reg, RSP, f.localAddr(int(e.p.locals[i].index)))
+	}
+}
+func (e *regionLoopEmitter) map32EarlyCount() {
+	f, p := e.f, e.p
+	a, b := e.gp[0], e.gp[1]
+	if p.zeroTerminated {
+		e.map32EntryInteger(int(p.counter), a)
+		f.a.TestSelf(a, false)
+		e.fail(condE)
+	} else {
+		for i, c := range p.nodes[p.limit].coeff {
+			if c != 0 {
+				e.map32EntryInteger(i, a)
+			}
+		}
+		e.map32EntryInteger(int(p.counter), b)
+		f.a.Cmp32(a, b)
+		e.fail(condBE)
+		f.a.Sub32(a, b)
+		step := p.locals[p.counter].step
+		if step != 1 {
+			f.a.TestImm(a, step-1, false)
+			e.fail(condNE)
+			for shift := uint8(0); shift < 32; shift++ {
+				if step == 1<<shift {
+					f.a.ShiftImm(5, a, shift, false)
+					break
+				}
+			}
+		}
+	}
+	f.a.AluRI(7, a, map32MinCount, false)
+	e.fail(condB)
+	f.a.Store32(RSP, e.off(8), a)
 }

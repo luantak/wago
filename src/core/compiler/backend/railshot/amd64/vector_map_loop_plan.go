@@ -65,6 +65,7 @@ type regionLoopPlan struct {
 	scalar                       bool
 	wide                         bool
 	map32                        bool
+	headerCount                  uint8
 	reductionLoad                [2]uint8
 }
 
@@ -285,7 +286,50 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 			} else {
 				id = p.integer(op, a, b)
 			}
+		case 0x45:
+			if step != 1 || depth != 1 || p.nodes[stack[0]].op != 0 {
+				return false
+			}
+			id = p.add(regionLoopNode{op: op, left: stack[0]})
+			depth--
+		case 0x0c:
+			if p.headerCount == 0 || imm.Index != 0 || depth != 0 || !p.map32 {
+				return false
+			}
+			l := p.locals[p.headerCount-1]
+			zero := p.add(regionLoopNode{})
+			id = p.add(regionLoopNode{op: 0x47, left: l.value, right: zero, uses: p.nodes[l.value].uses})
+			if zero == 0 || id == 0 {
+				return false
+			}
+			end, err := r.Byte()
+			if err != nil || end != 0x0b {
+				return false
+			}
+			p.endPC, p.predicate, p.zeroTerminated = start+r.Offset(), id, true
+			return p.finish()
 		case 0x0d:
+			if step == 2 && imm.Index == 1 && depth == 1 && p.nodes[stack[0]].op == 0x45 {
+				value := p.nodes[p.nodes[stack[0]].left]
+				if value.bits != 0 {
+					return false
+				}
+				found := false
+				for i, c := range value.coeff {
+					if c != 0 {
+						if c != 1 || found {
+							return false
+						}
+						p.headerCount = uint8(i + 1)
+						found = true
+					}
+				}
+				if !found {
+					return false
+				}
+				depth--
+				continue
+			}
 			// A branch on an affine integer is exactly a comparison with zero.
 			// Guarded modular trip counting separately proves termination.
 			if regionZeroCounterEnabled && depth == 1 && p.nodes[stack[0]].op == 0 {
@@ -337,6 +381,9 @@ func (p *regionLoopPlan) stride(id uint8) uint32 {
 }
 
 func (p *regionLoopPlan) finish() bool {
+	if p.headerCount != 0 && !p.map32 {
+		return false
+	}
 	if !p.map32 {
 		for _, l := range p.locals[:p.localN] {
 			if l.typ == mtF32 {
@@ -370,7 +417,7 @@ func (p *regionLoopPlan) finish() bool {
 			continue
 		}
 		n := p.nodes[l.value]
-		if n.op != 0 || n.uses != 1<<i || n.coeff[i] != 1 || n.bits == 0 || n.bits >= 1<<31 {
+		if n.op != 0 || n.uses != 1<<i || n.coeff[i] != 1 || n.bits == 0 || (n.bits >= 1<<31 && !(p.map32 && n.bits == 0xffffffff)) {
 			return false
 		}
 		l.step = uint32(n.bits)
@@ -396,7 +443,7 @@ func (p *regionLoopPlan) finish() bool {
 		return false
 	}
 	step := p.locals[p.counter].step
-	if step&(step-1) != 0 {
+	if step&(step-1) != 0 && !(p.map32 && p.zeroTerminated && step == 0xffffffff) {
 		return false
 	}
 	// Affine streams must move forward monotonically. Runtime guards prove that
