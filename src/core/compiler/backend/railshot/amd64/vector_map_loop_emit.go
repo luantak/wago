@@ -808,7 +808,12 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 			prefix, permanent = p.invariantPrefix(regionInvariantPrefixEnabled)
 		}
 	}
-	folded, memory := p.memoryForms(memoryForms)
+	var folded [regionLoopMaxOps + 1]bool
+	var memory [regionLoopMaxOps + 1]uint8
+	// Fixed i32/f32 maps do not use f64 memory forms.
+	if !p.map32 {
+		folded, memory = p.memoryForms(memoryForms)
+	}
 	need := 3
 	if !p.map32 {
 		need = p.scratchNeedPermanent(folded, permanent)
