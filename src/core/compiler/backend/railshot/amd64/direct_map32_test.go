@@ -89,7 +89,7 @@ func TestDirectMap32Semantics(t *testing.T) {
 							t.Fatal(ae, be)
 						}
 						for i := range x.Frames {
-							if x.Frames[i].ProgramCounter != y.Frames[i].ProgramCounter+1 {
+							if x.Frames[i].HasProgramCounter != y.Frames[i].HasProgramCounter || x.Frames[i].HasProgramCounter && x.Frames[i].ProgramCounter != y.Frames[i].ProgramCounter+1 {
 								t.Fatal("source trap position changed", x.Frames, y.Frames)
 							}
 						}

@@ -93,6 +93,9 @@ func (e *regionLoopEmitter) stream(address uint8, offset uint64) uint8 {
 	i := e.streamN
 	e.streamN++
 	width := uint8(8)
+	if e.p.map32 {
+		width = 4
+	}
 	if e.p.adjacent && e.p.stride(address) != 0 {
 		width = 16
 	}
@@ -169,9 +172,13 @@ func (e *regionLoopEmitter) guards() {
 	}
 	// The two-lane path requires complete pairs. Wide groups instead leave
 	// zero to three iterations for the original checked body.
-	if !p.adjacent && !p.scalar && !p.wide {
+	if !p.adjacent && !p.scalar && !p.wide && !p.map32 {
 		f.a.TestImm(a, 1, false)
 		e.fail(condNE)
+	}
+	if p.map32 {
+		f.a.AluRI(7, a, map32MinCount, false)
+		e.fail(condB)
 	}
 	f.a.Store64(RSP, e.off(8), a)
 	for _, l := range p.loads[:p.loadN] {
@@ -759,7 +766,11 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	if !inspectRegionLoop(look, f.localType, f.classifier, &p) {
 		return false, nil
 	}
-	if p.storeN <= 2 && p.independentLanes() {
+	if p.map32 {
+		if !p.qualifyMap32() || (p.nodes[p.loads[0].node].op == 0x28 && !f.cpuHas(shared.AMD64SSE41)) {
+			return false, nil
+		}
+	} else if p.storeN <= 2 && p.independentLanes() {
 		if !regionLoopEnabled && !(regionWideIndependentEnabled && f.cpuHas(shared.AMD64AVX)) && !(regionZeroCounterEnabled && p.zeroTerminated) {
 			return false, nil
 		}
@@ -784,7 +795,9 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	var prefix uint8
 	var permanent [regionLoopMaxOps + 1]bool
 	constantPrefix := false
-	if p.scalar {
+	if p.map32 {
+		// The fixed map emits its two invariant operands once.
+	} else if p.scalar {
 		memoryForms = scalarLoopMemoryFormsEnabled
 		prefix, permanent = p.prepareMemoryRecurrence()
 	} else {
@@ -795,7 +808,10 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 		}
 	}
 	folded, memory := p.memoryForms(memoryForms)
-	need := p.scratchNeedPermanent(folded, permanent)
+	need := 3
+	if !p.map32 {
+		need = p.scratchNeedPermanent(folded, permanent)
+	}
 	if step&(step-1) != 0 || need > 10 {
 		return false, nil
 	}
@@ -828,13 +844,18 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	reserved, pinned := f.reserved, f.pinned
 	memSize, memLease := f.memSizeReg, f.memSizeRegionalLease
 	slots := regionLoopSlots
+	if p.map32 {
+		slots = 11
+	}
 	if p.wide {
 		slots += 3
 	}
 	e.slot = f.allocSpillSlots(slots)
 	e.guards()
 	e.aliasGuards()
-	e.coalesceStreams()
+	if !p.map32 {
+		e.coalesceStreams()
+	}
 	toFast := f.a.JmpPlaceholder()
 	if f.compactLoopAlign32 {
 		f.a.AlignLoop32()
@@ -903,8 +924,13 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 			valid = false
 		}
 	}
+	if p.map32 && !f.regionCheckedTailHomes(&entry) {
+		valid = false
+	}
 	if valid {
-		e.prepareRegisterStreams(&entry)
+		if !p.map32 {
+			e.prepareRegisterStreams(&entry)
+		}
 		if e.allCached {
 			f.stats.peep("region-loop-all-addresses-cached")
 		}
@@ -937,7 +963,11 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 		if p.wide && regionWideCheckedTailEnabled && f.regionCheckedTailHomes(&entry) {
 			checkedTail = checkedBody
 		}
-		e.bodyWithWidths(checkedTail)
+		if p.map32 {
+			e.bodyMap32(checkedBody)
+		} else {
+			e.bodyWithWidths(checkedTail)
+		}
 		if prefix != 0 {
 			if constantPrefix {
 				f.stats.peep("region-loop-constant-hoist")

@@ -64,6 +64,7 @@ type regionLoopPlan struct {
 	zeroTerminated               bool
 	scalar                       bool
 	wide                         bool
+	map32                        bool
 	reductionLoad                [2]uint8
 }
 
@@ -91,7 +92,7 @@ func (p *regionLoopPlan) local(index uint32, typ machineType) (uint8, bool) {
 			return i, true
 		}
 	}
-	if p.localN == regionLoopMaxLocals || (typ != mtI32 && typ != mtF64) {
+	if p.localN == regionLoopMaxLocals || (typ != mtI32 && typ != mtF32 && typ != mtF64) {
 		return 0, false
 	}
 	i := p.localN
@@ -197,7 +198,7 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 			if op == 0x20 {
 				id = p.locals[i].value
 			} else {
-				if depth == 0 || (types[imm.Index] == mtI32 && p.nodes[stack[depth-1]].op != 0) || (types[imm.Index] == mtF64 && !regionFloat(p.nodes[stack[depth-1]])) {
+				if depth == 0 || (types[imm.Index] == mtI32 && p.nodes[stack[depth-1]].op != 0 && !p.map32) || (types[imm.Index] == mtF64 && !regionFloat(p.nodes[stack[depth-1]])) || (types[imm.Index] == mtF32 && !p.map32Float(stack[depth-1])) {
 					return false
 				}
 				p.locals[i].value, p.locals[i].written = stack[depth-1], true
@@ -213,13 +214,19 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 				return false
 			}
 			id = p.add(regionLoopNode{bits: uint64(uint32(x))})
+		case 0x43:
+			x, err := look.Bytes(4)
+			if err != nil {
+				return false
+			}
+			id = p.add(regionLoopNode{op: op, bits: uint64(binary.LittleEndian.Uint32(x))})
 		case 0x44:
 			x, err := look.Bytes(8)
 			if err != nil {
 				return false
 			}
 			id = p.add(regionLoopNode{op: op, bits: binary.LittleEndian.Uint64(x)})
-		case 0x2b:
+		case 0x28, 0x2a, 0x2b:
 			if depth == 0 || imm.MemIndex != 0 || imm.MemOffset > uint64(^uint32(0)) {
 				return false
 			}
@@ -228,28 +235,44 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 			if p.nodes[a].op != 0 {
 				return false
 			}
+			if op != 0x2b {
+				p.map32 = true
+			}
 			id = p.add(regionLoopNode{op: op, left: a, bits: imm.MemOffset, uses: p.nodes[a].uses})
-		case 0x39:
+		case 0x36, 0x38, 0x39:
 			if depth < 2 || p.storeN == 4 || (p.storeN == 2 && !regionAdjacentMultiEnabled) || imm.MemIndex != 0 || imm.MemOffset > uint64(^uint32(0)) {
 				return false
 			}
 			depth -= 2
 			a, b := stack[depth], stack[depth+1]
-			if p.nodes[a].op != 0 || !regionFloat(p.nodes[b]) {
+			if p.nodes[a].op != 0 || (op == 0x39 && !regionFloat(p.nodes[b])) || (op == 0x38 && !p.map32Float(b)) || (op == 0x36 && !p.map32Int(b)) {
 				return false
+			}
+			if op != 0x39 {
+				p.map32 = true
 			}
 			p.stores[p.storeN] = regionLoopStore{offset: imm.MemOffset, pos: position, address: a, value: b}
 			p.events[p.eventN] = 0x80 | p.storeN
 			p.eventN++
 			p.storeN++
 			continue
-		case 0x6a, 0x6b, 0x6c, 0x74, 0xa0, 0xa1, 0xa2, 0xa3, 0x47:
+		case 0x92, 0x94, 0x6a, 0x6b, 0x6c, 0x74, 0xa0, 0xa1, 0xa2, 0xa3, 0x47:
 			if depth < 2 {
 				return false
 			}
 			depth -= 2
 			a, b := stack[depth], stack[depth+1]
-			if op >= 0xa0 && op <= 0xa3 {
+			if op == 0x92 || op == 0x94 {
+				if !p.map32Float(a) || !p.map32Float(b) {
+					return false
+				}
+				id = p.add(regionLoopNode{op: op, left: a, right: b, uses: p.nodes[a].uses | p.nodes[b].uses})
+			} else if p.map32 && (op == 0x6a || op == 0x6c) && (p.nodes[a].op != 0 || p.nodes[b].op != 0) {
+				if !p.map32Int(a) || !p.map32Int(b) {
+					return false
+				}
+				id = p.add(regionLoopNode{op: op, left: a, right: b, uses: p.nodes[a].uses | p.nodes[b].uses})
+			} else if op >= 0xa0 && op <= 0xa3 {
 				if !regionFloat(p.nodes[a]) || !regionFloat(p.nodes[b]) {
 					return false
 				}
@@ -295,7 +318,7 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 		if op != 0x20 {
 			p.nodes[id].pos = position
 		}
-		if op == 0x2b || op == 0x44 || op >= 0xa0 && op <= 0xa3 {
+		if op == 0x28 || op == 0x2a || op == 0x43 || (p.map32 && id != 0 && p.nodes[id].op != 0 && op != 0x47 && op != 0x20) || op == 0x2b || op == 0x44 || op >= 0xa0 && op <= 0xa3 {
 			p.events[p.eventN] = id
 			p.eventN++
 		}
@@ -314,6 +337,18 @@ func (p *regionLoopPlan) stride(id uint8) uint32 {
 }
 
 func (p *regionLoopPlan) finish() bool {
+	if !p.map32 {
+		for _, l := range p.locals[:p.localN] {
+			if l.typ == mtF32 {
+				return false
+			}
+		}
+		for _, n := range p.nodes[:p.nodeN+1] {
+			if n.op == 0x43 || n.op == 0x92 || n.op == 0x94 {
+				return false
+			}
+		}
+	}
 	var live uint8
 	for _, store := range p.stores[:p.storeN] {
 		live |= p.nodes[store.address].uses | p.nodes[store.value].uses
@@ -331,7 +366,7 @@ func (p *regionLoopPlan) finish() bool {
 		if !l.written || live&(1<<i) == 0 {
 			continue
 		}
-		if l.typ == mtF64 {
+		if l.typ == mtF64 || l.typ == mtF32 || (p.map32 && p.nodes[l.value].op != 0) {
 			continue
 		}
 		n := p.nodes[l.value]
@@ -373,7 +408,7 @@ func (p *regionLoopPlan) finish() bool {
 	}
 	for id := uint8(1); id <= p.nodeN; id++ {
 		n := p.nodes[id]
-		if n.op != 0x2b {
+		if n.op != 0x2b && !(p.map32 && (n.op == 0x28 || n.op == 0x2a)) {
 			continue
 		}
 		if p.loadN == regionLoopMaxLoads {
@@ -383,7 +418,11 @@ func (p *regionLoopPlan) finish() bool {
 		if stride >= 1<<31 {
 			return false
 		}
-		p.loads[p.loadN] = regionLoopLoad{node: id, bytes: 8, stride: stride}
+		width := uint8(8)
+		if n.op == 0x28 || n.op == 0x2a {
+			width = 4
+		}
+		p.loads[p.loadN] = regionLoopLoad{node: id, bytes: width, stride: stride}
 		p.loadN++
 	}
 	return p.loadN > 0
