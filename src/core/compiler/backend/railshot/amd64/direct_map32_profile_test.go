@@ -1,4 +1,4 @@
-//go:build linux && amd64 && wago_profile
+//go:build (linux || darwin || windows) && amd64 && wago_profile
 
 package amd64
 

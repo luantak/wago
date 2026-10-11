@@ -14,7 +14,6 @@ const (
 	immediateFreeOpMask       = uint16(1<<9 - 1) // the existing count saturates at 256
 	map32I32HintShift         = 9
 	map32F32HintShift         = 12
-	map32HintMask             = uint16(7<<map32I32HintShift | 7<<map32F32HintShift)
 )
 
 func (h funcHints) map32HintCount() int {
