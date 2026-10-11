@@ -219,6 +219,25 @@ func BenchmarkDirectMap32Execute(b *testing.B) {
 	}
 }
 
+// Public compilation uses heap staging before the first executable mapping.
+// Measure it separately: mapped native bytes do not appear in Go B/op.
+func BenchmarkDirectMap32CompileHeap(b *testing.B) {
+	for _, name := range []string{"i32", "f32", "rejected"} {
+		b.Run(name, func(b *testing.B) {
+			m := directMap32Fixture(b, name == "f32", name == "rejected")
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				cm, err := CompileModuleWith(m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, DeferCodeMapping: true})
+				if err != nil {
+					b.Fatal(err)
+				}
+				cm.CodeImage.Close()
+			}
+		})
+	}
+}
+
 func TestDirectMap32Artifacts(t *testing.T) {
 	dir := os.Getenv("DIRECT_MAP32_ARTIFACTS")
 	if dir == "" {

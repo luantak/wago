@@ -13,8 +13,9 @@ p.add_argument("mode", choices=["thresholds", "final"])
 p.add_argument("--baseline", required=True, type=Path)
 p.add_argument("--samples", type=int, default=6)
 p.add_argument("--label", help="new results directory name")
-p.add_argument("--backend-regex", default="^Benchmark(DirectMap32|LinearSumNoWrapAMD64|CompileLinearSumAMD64)")
+p.add_argument("--backend-regex", action="append", help="repeat for different benchmark depths")
 a = p.parse_args()
+a.backend_regex = a.backend_regex or ["^Benchmark(DirectMap32|LinearSumNoWrapAMD64|CompileLinearSumAMD64)"]
 root = Path(__file__).resolve().parents[2]
 lab = root / "experiments/direct-simd-map"
 out = lab / "results" / (a.label or a.mode)
@@ -95,7 +96,8 @@ else:
         if i % 2:
             order.reverse()
         for name, binary, api in order:
-            measure(binary, "backend", a.backend_regex, name, 1, "150ms")
+            for regex in a.backend_regex:
+                measure(binary, "backend", regex, name, 1, "150ms")
             measure(api, "api", "^BenchmarkDirectMap32WholeProgram$", name + "-whole", 1, "150ms")
     for left, right, label in [("main", "candidate", "backend"), ("main-whole", "candidate-whole", "whole")]:
         with (out / f"benchstat-{label}.txt").open("w") as f:
