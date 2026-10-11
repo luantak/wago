@@ -4,6 +4,7 @@ package amd64
 
 import (
 	"bytes"
+	"encoding/binary"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 	"reflect"
 	"testing"
@@ -280,5 +281,82 @@ func TestDirectMap32HintPacking(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestDirectMap32MixedPackingAndNestedShape(t *testing.T) {
+	s := byteBodyScanner{}
+	s.h.noteFixedScratchLease()
+	for i := 0; i < 300; i++ {
+		s.noteImmediateFreeOp()
+	}
+	for i := 0; i < 5; i++ {
+		s.map32Shape = map32HintActive | map32HintBranch | map32HintLoadI32 | map32HintStoreI32 | map32HintMulI32
+		if i%2 != 0 {
+			s.map32Shape = map32HintActive | map32HintBranch | map32HintLoadF32 | map32HintStoreF32 | map32HintMulF32
+		}
+		s.finishMap32Hint()
+	}
+	s.noteImmediateFreeOp()
+	s.h.noteFixedScratchLease()
+	if s.h.immediateFreeOpCount() != 256 || !s.h.hasFixedScratchLease() || s.h.map32HintCount() != 4 {
+		t.Fatal("packed field interference", s.h)
+	}
+	m := directMap32Fixture(t, false, false)
+	if got := directMap32CodeReserve(m, 0, s.h.funcHints, &CompileOptions{}); got != 2*map32CodeReserve {
+		t.Fatal("CPU filter lost mixed counts", got)
+	}
+	original := m.Code[0].BodyBytes
+	start := bytes.Index(original, []byte{3, 0x40})
+	stop := start + bytes.Index(original[start:], []byte{0x0d, 0, 0x0b}) + 3
+	loop := original[start:stop]
+	body := append([]byte{3, 0x40}, loop...)
+	body = append(body, 0x0b)
+	body = append(body, loop...)
+	body = append(body, 0x41, 0, 0x0b)
+	m.Code[0].BodyBytes = body
+	if err := wasm.ValidateModule(m); err != nil {
+		t.Fatal(err)
+	}
+	h, _, _, err := computeModuleHints(m, 0, 0, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h[0].map32HintCount() != 2 {
+		t.Fatal("nested/sibling map counts", h[0].map32HintCount())
+	}
+}
+
+func TestDirectMap32ConservativeReserveKeepsScalar(t *testing.T) {
+	m := directMap32Fixture(t, false, false)
+	m.Code[0].BodyBytes = bytes.Replace(m.Code[0].BodyBytes, []byte{0x20, 4, 0x6c}, []byte{0x20, 4, 0x6c, 0x41, 0, 0x73}, 1)
+	if err := wasm.ValidateModule(m); err != nil {
+		t.Fatal(err)
+	}
+	h, _, _, err := computeModuleHints(m, 0, 0, nil, false)
+	if err != nil || h[0].map32HintCount() != 1 {
+		t.Fatal("false-positive fixture", err)
+	}
+	if diagnosticsEnabled {
+		var stats ModuleStats
+		cm, err := CompileModuleWith(m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: &stats})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cm.CodeImage.Close()
+		if stats.Funcs[0].Peephole["region-loop-map32"] != 0 {
+			t.Fatal("sizing hint authorized SIMD")
+		}
+	}
+	args := []uint64{128, 1024, 0, 32, 2, 1}
+	setup := func(mem []byte) {
+		for i := 0; i < 32; i++ {
+			binary.LittleEndian.PutUint32(mem[1024+4*i:], uint32(i))
+		}
+	}
+	a, am, ae := runMemAmd64WithOptions(t, directMap32Fixture(t, false, true), CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, setup, args...)
+	b, bm, be := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, setup, args...)
+	if ae != nil || be != nil || !reflect.DeepEqual(a, b) || !bytes.Equal(am, bm) {
+		t.Fatal("false-positive reserve changed scalar result", ae, be)
 	}
 }
