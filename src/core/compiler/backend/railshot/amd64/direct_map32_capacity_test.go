@@ -5,6 +5,7 @@ package amd64
 import (
 	"bytes"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
+	"reflect"
 	"testing"
 
 	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
@@ -40,7 +41,7 @@ func TestDirectMap32HeapAllocationBudget(t *testing.T) {
 }
 
 func TestDirectMap32CapacityPreservesCode(t *testing.T) {
-	for _, count := range []int{1, 32, 1024} {
+	for _, count := range []int{1, 32, 1024, 1025} {
 		m := directMap32Fixture(t, false, false)
 		fn := m.Code[0]
 		for len(m.Code) < count {
@@ -56,8 +57,13 @@ func TestDirectMap32CapacityPreservesCode(t *testing.T) {
 			opts.DeferCodeMapping = true
 			heap, err := CompileModuleWith(m, opts)
 			if err != nil {
-				mapped.CodeImage.Close()
+				if mapped.CodeImage != nil {
+					mapped.CodeImage.Close()
+				}
 				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(mapped.Entry, heap.Entry) || !reflect.DeepEqual(mapped.InternalEntry, heap.InternalEntry) || mapped.RequiredAMD64Features != heap.RequiredAMD64Features || mapped.RequiresBMI2 != heap.RequiresBMI2 || mapped.RequiresBitCount != heap.RequiresBitCount {
+				t.Errorf("functions=%d workers=%d: capacity changed entry or CPU metadata", count, workers)
 			}
 			if !bytes.Equal(mapped.Code, heap.Code) {
 				t.Errorf("functions=%d workers=%d: capacity changed native code", count, workers)
@@ -117,6 +123,52 @@ func TestDirectMap32ReserveBounds(t *testing.T) {
 			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
 				t.Fatal("large function exceeds scan bound")
 			}
+		}
+	}
+}
+
+func TestDirectMap32FunctionReserveLimit(t *testing.T) {
+	m := directMap32Fixture(t, false, false)
+	classifier := wasm.NewModuleInstructionClassifier(m, true)
+	r := wasm.ReaderFrom(m.Code[0].BodyBytes)
+	start, end := 0, 0
+	var types = []machineType{mtI32, mtI32, mtI32, mtI32, mtI32, mtI32, mtI32}
+	for r.BytesLeft() > 0 {
+		pc := r.Offset()
+		op, _ := r.Byte()
+		var imm wasm.InstructionImmediate
+		if classifier.ClassifyInto(&r, op, &imm) != nil {
+			t.Fatal("invalid fixture")
+		}
+		if op == 3 {
+			var p regionLoopPlan
+			if !inspectRegionLoop(r, types, classifier, &p) {
+				t.Fatal("fixture loop rejected")
+			}
+			start, end = pc, p.endPC
+			break
+		}
+	}
+	if end == 0 {
+		t.Fatal("fixture has no loop")
+	}
+	original := m.Code[0].BodyBytes
+	loop := original[start:end]
+	for _, count := range []int{1, 4, 5} {
+		body := append([]byte(nil), original[:start]...)
+		for i := 0; i < count; i++ {
+			body = append(body, loop...)
+		}
+		body = append(body, original[end:]...)
+		m.Code[0].BodyBytes = body
+		h, err := scanFuncBody(m.Code[0], len(types), 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := directMap32CodeReserve(m, 0, h.funcHints, CompileOptions{AMD64Features: shared.AMD64ModernBaseline}, classifier)
+		want := min(count*map32CodeReserve, map32FunctionReserveLimit)
+		if got != want {
+			t.Errorf("loops=%d reserve=%d want=%d", count, got, want)
 		}
 	}
 }
