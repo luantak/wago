@@ -1,50 +1,45 @@
 # Direct SIMD scalar maps
 
-**ITERATE. The bounded capacity fix removes the two extra allocations in the measured maps. It adds a measurable compile-time cost. Keep the work on the experiment branch.**
+**ITERATE. Hint reuse removes the repeated capacity scan and keeps the allocation target. The final timings do not prove that total compile cost or ALU cost is now equal to main. Keep the implementation on the experiment branch.**
 
-Wago can automatically emit useful native SIMD maps from the original scalar Wasm bytes. The allocation target is now met for the tested shapes. Default promotion still needs a lower compile cost and stronger workload evidence.
+The final source is `d6bca7168c33a25f50e831140d1c8c39c98b78cf`, on `codex/direct-simd-map`. Main is pinned to `cea8f83f101fbdd0fcad634e9c7faad0377b676e`, fetched at the start of this follow-up. The previous capacity build is `1ca658021`. Both comparisons have matched host code. The failing hint-reuse test was committed first in `3caa8044e`; implementation followed in `eea214d06`. Work stayed in the experiment worktree.
 
-Latest main is `cea8f83f101fbdd0fcad634e9c7faad0377b676e`. The final measured build is merge commit `f62d4ca2d1a1aae62563b03b0c9ed3b522e1c05b`, on `codex/direct-simd-map`. It adds the same upstream host-call change as main; compiler source is unchanged from `66d6c445b`. The isolated capacity comparison uses `9b0e87570` against `66d6c445b`, with matched host code. The failing allocation test was committed in `b6e6ebfbd`, before the implementation in `424ef3b64`. Later commits removed the repeated serial sizing scan, added a cheap multiply-byte filter, and reduced the reserve from 1,024 to 512 bytes. The user's working checkout was not changed.
+The existing hint scan now records small map shapes in unused bits of the density field. Density, map counts and the fixed-register lease have separate masks. Retained hint headers stay at 28 bytes; sidecars are unchanged. Capacity reads these counts during the existing module body-length walk. It no longer decodes the body, builds a local-type array or calls the planner. Functions with zero map hints skip the helper. The options argument is passed by pointer, and the transient sizing field has been removed. No allocation or retained tape was added.
 
-The fix uses existing loop hints to skip ordinary functions. It scans functions no larger than 512 bytes with fixed arrays and the existing planner. It reserves 512 bytes per qualified map, at most four maps / 2 KiB per function and 1 MiB per initial module buffer. Retained hint headers and sidecars are unchanged. The serial encoder receives all remaining module capacity. Parallel workers use a temporary sizing hint. The large-module heap trim preserves the added reserve. Normal growth remains available for larger functions or insufficient estimates. A later native home check can reject a plan that received capacity; this estimate does not authorize emission.
+Reserve remains bounded: 512 bytes per hint, four hints / 2 KiB per function, and 1 MiB per initial module buffer. Only bodies up to 512 bytes and 256 locals receive hints. CPU, memory, EH, interruptible, custom-instruction and GC-root gates remain. The hint is a conservative sizing estimate. Full planning, native register checks and runtime guards still control SIMD emission. Native output is unchanged from the previous capacity build.
 
-The SIMD path remains automatic: four i32/f32 lanes, one load/store with stride four, invariant multiplication, and optional addition. It keeps the original checked scalar body for fallback and tails. SSE4.1 is required for `pmulld`; f32 uses separate `mulps`/`addps`, with no FMA. Recognition and emission use no module clone, rewrite, source-position tape, second compilation, or general IR. ARM64 is unchanged.
+The final full comparison has 64 backend cases and six public cases, with six alternating samples per version at 150 ms per case. The final previous-build comparison has seven compile/hint cases and six public cases, with six samples at one second per case. Both use CPU 6, Ryzen 7 8845HS, Go 1.27.1 and `GOMAXPROCS=1`. Inputs, feature masks, source hashes, harness hashes and binary hashes are retained in [hints-final-main](results/hints-final-main/) and [hints-final-before](results/hints-final-before/). Public CPU selection remains `0x7ff`. Other Go, TinyGo and QEMU activity was observed on the host. Timing variation is large; no samples were removed.
 
-The final comparisons each contain six alternating samples for 63 backend cases and six public cases. They use CPU 6 on a Ryzen 7 8845HS, Go 1.27.1, `GOMAXPROCS=1`, identical inputs and feature masks. Raw data, benchstat, source/input/binary hashes, and settings are in [capacity-latest-main](results/capacity-latest-main/) and [capacity-before](results/capacity-before/). Public CPU selection is `0x7ff` on both versions. Several timing rows have large outliers.
-
-| Measurement | Main | Final | Result |
+| Allocation measurement | Main | Previous capacity | Final |
 |---|---:|---:|---:|
-| i32 execution, 8,192 elements | 5.473 µs | 0.570 µs | −89.58% |
-| f32 execution, 8,192 elements | 4.059 µs | 0.939 µs | −76.87% |
-| Original Yosys routine, 8,192 elements per array | 11.309 µs | 1.849 µs | −83.65% |
-| i32 heap compile | 7.779 µs | 10.640 µs | +36.79% |
-| f32 heap compile | 7.474 µs | 10.302 µs | +37.85% |
-| i32 heap bytes / allocations | 12,488 / 30 | 13,096 / 30 | +608 bytes, no added allocations |
-| f32 heap bytes / allocations | 12,520 / 30 | 13,096 / 30 | +576 bytes, no added allocations |
-| Rejected heap bytes / allocations | 12,520 / 30 | 12,520 / 30 | unchanged |
+| i32 heap bytes / allocations | 12,488 / 30 | 13,096 / 30 | 13,096 / 30 |
+| f32 heap bytes / allocations | 12,520 / 30 | 13,096 / 30 | 13,096 / 30 |
+| Public bytes / allocations, both types | 22,465–22,497 / 104 | 23,073 / 104 | 23,073 / 104 |
 
-These execution and heap-compile timing changes have `p=0.002`. At 4,194,304 elements, i32 improves 65.33% and f32 improves 54.26%. Execution has zero bytes and allocations per call. Mapped compilation is 14.28→17.41 µs for i32 (+21.95%) and 14.53→17.52 µs for f32 (+20.59%), both `p=0.002`. Ordinary/rejected control allocations and bytes stay the same. ALU compilation is 3.80% slower (`p=0.009`), after a 5.82% increase against the previous experiment (`p=0.026`). That control has no loop, so the cause remains unproved; it is a repeated no-match cost to investigate. Other no-match controls and existing sum execution show no detected regression. Counts 0–9 show no detected execution change; i32 count 15 is 2.44% slower (0.70 ns, `p=0.026`).
+All final-main backend and public rows keep main's allocation count. The focused comparison keeps the previous build's bytes and counts. The earlier capacity fix's two-allocation reduction, 32→30 for heap compilation and 106→104 for public compilation, is retained. Execution uses zero bytes and allocations. The final heap profile has no samples at either former growth site; this confirms the measured fixture, not every possible shape.
 
-The capacity fix exchanges allocation churn for compile work:
-
-| Measurement | Before fix | Final | Result |
+| Final comparison with main | Main | Final | Result |
 |---|---:|---:|---:|
-| i32 heap bytes / allocations | 14,152 / 32 | 13,096 / 30 | −1,056 bytes, −2 allocations |
-| f32 heap bytes / allocations | 14,184 / 32 | 13,096 / 30 | −1,088 bytes, −2 allocations |
-| Public bytes / allocations, i32 | 24,129 / 106 | 23,073 / 104 | −1,056 bytes, −2 allocations |
-| Public bytes / allocations, f32 | 24,161 / 106 | 23,073 / 104 | −1,088 bytes, −2 allocations |
-| i32 mapped compile | 17.20 µs | 18.78 µs | +9.21%, p=0.002 |
-| f32 mapped compile | 17.41 µs | 19.45 µs | +11.69%, p=0.002 |
-| i32 heap compile | 9.996 µs | 11.763 µs | +17.67%, p=0.041 |
+| i32 execution, 8,192 elements | 6.940 µs | 0.764 µs | −89.00%, p=0.002 |
+| f32 execution, 8,192 elements | 4.403 µs | 1.424 µs | −67.65%, p=0.002 |
+| Original Yosys routine, 8,192 elements | 15.061 µs | 2.289 µs | −84.80%, p=0.002 |
+| i32 heap compile | 9.611 µs | 12.352 µs | no proved difference, p=0.132 |
+| f32 heap compile | 9.322 µs | 15.501 µs | +66.28%, p=0.041 |
+| ALU compile | 35.810 µs | 35.200 µs | no proved difference, p=0.937 |
+| ALU hint scan | 6.958 µs | 6.591 µs | no proved difference, p=0.699 |
 
-The f32 heap timing change is inconclusive. Public one-call comparisons have no statistically significant change. Latest candidate medians are 11–21% higher; the baseline has a shared final-sample spike. This does not establish equal timing or a one-call speed gain. Public allocations meet the target.
+At 4,194,304 elements, i32 improves 56.33% and f32 improves 52.80%. Small-count and ordinary compile rows do not establish equal speed. Mapped i32/f32 compilation is 18.68→20.92 µs / 17.85→20.50 µs, with no proved difference. The f32 heap increase remains a concern despite host noise. Public compile–instantiate–invoke–close timing proves no gain in either final comparison.
 
-Actual heap staging grows 832/842→928/933 bytes against the previous build. These capacities include the reserve, not just live native bytes. Mapped single-function pages stay at 4,096 bytes. For 1,024 maps, staging falls 1,078,464→793,904 bytes. Ordinary/rejected capacities and hint storage are unchanged. The heap profile has no samples at either former growth site. A separate CPU profile assigns 6.89% of samples to the new capacity check, including 5.23% to the planner. Profile timings are excluded from normal results. See [resource and profile evidence](results/capacity-checks/).
+Against previous capacity, mapped i32/f32 compilation is 18.10→20.62 µs / 19.81→18.76 µs. Heap i32/f32 is 10.45→10.82 µs / 10.28→14.00 µs. ALU compilation is 28.747→30.607 µs and isolated hints are 5.229→5.787 µs. All seven backend timing comparisons have p≥0.589. These results do not prove that the compile penalty is removed.
 
-The next practical step is to reuse recognition information from the existing hint scan instead of repeating static map recognition for capacity. Test whether this removes the measured compile penalty while keeping 30 heap allocations, 104 public allocations, bounded memory, and unchanged no-match costs. This is a proposed mitigation, not a demonstrated result.
+The ALU investigation found two former costs: an unconditional capacity-helper call with a large options copy and a larger transient hint view. Both are removed. The first hint implementation also changed opcode dispatch and measured a 5.68% isolated scan increase. Two switch-layout trials moved that cost. The selected final layout keeps the original dispatch and puts shape updates inside the existing immediate-free case. Constants bypass shape work; add still executes a shape load, test and skip branch. The scan wrapper uses eight more stack bytes than main. Separate CPU profiles show the capacity helper falling from 9.38% to 0.29% of samples; the remaining emission planner is 3.54%. This supports removal of duplicate work, not a net wall-time claim. Profile timings are excluded from ordinary comparisons.
 
-Native bytes are unchanged by the capacity fix. The i32/f32 functions remain 758/760 bytes with 136-byte frames and zero reported spills/reloads. Yosys function 5011 remains 1,345 bytes, frame 136, zero spills, three reloads. Compared with main, those frames and functions remain larger. The corpus still has 124 modules, 282,805 functions, and 222,984 loops. Seven Yosys plans match; three emit SIMD in function 5011. Its original routine benefits, but whole-Yosys speed and normal-use hotness remain unproved. [COVERAGE.md](COVERAGE.md) retains the broader search and rejection reasons.
+Conservative hints exchange repeated proof for some unused storage. One rejected XOR-zero shape keeps native output at 246 bytes but grows heap staging 431→943 bytes. Four rejected shapes in a 512-byte body keep native output at 531 bytes but grow the compiler arena 4,096→8,192 and heap staging 2,640→4,688 bytes. Allocation counts stay equal. The executable-page projection from live native bytes stays 4,096; it is separate from actual compiler arena capacity. Accepted staging remains 928/933 bytes, and 1,024 maps remain at 793,904 bytes. Hint storage is unchanged. See [resource, profile and verification evidence](results/hint-checks/).
 
-Focused correctness, allocation, native-admission, capacity-boundary, and profile tests pass. They include counter variants, affine operands, multiple last-value homes, four/five maps, 2,048/2,049 functions, serial/parallel output, entry offsets, and CPU metadata. ARM64 cross-compilation passes. The diagnostic suite at `66d6c445b` has the same 24 failing top-level tests as the initial main baseline, with no new failures. The latest-main merge changes no backend code; focused backend and public admission tests pass after the merge. Full CI is not green; the earlier root run also lacked staged conformance inputs.
+The combined hint scan covers the same 124 modules and 282,805 functions as the broader search. It finds 12 hinted functions, 23 hints and 11,776 reserve bytes before module caps. Eleven hinted functions have no full static plan. One contains three static plans. These counts do not prove native admission. The broader search still has seven planner matches; only three emit in Yosys function 5011. All seven saved native/input artifact hashes match previous capacity. i32/f32 native functions stay at 758/760 bytes, frame 136, zero reported spills/reloads. Yosys 5011 stays at 1,345 bytes, frame 136, zero spills and three reloads. Whole-Yosys speed and normal-use hotness remain unproved. [COVERAGE.md](COVERAGE.md) records the search.
 
-Independent GPT correctness review found no blocking defect. The performance review confirmed the allocation repair and recommended ITERATE because of the measured compile penalty and no-match control cost. The author verified the raw results and profile evidence. Claude Code was attempted again with read-only tools; it exited with “Not logged in.” No Claude review occurred. [REVIEW.md](REVIEW.md) records the findings. No PR or opt-in mode was created. [The earlier report](REPORT-before-capacity.md) preserves the pre-fix evidence.
+Focused correctness, packing, density saturation, lease, nesting, parallel scan, capacity-boundary, allocation, native-admission, scalar fallback, source-position and public admission checks pass. ARM64 cross-compilation passes. Full diagnostic backend runs have the same 24 failing top-level tests / 86 failing names on main and final, with no new failures. Full CI is not green; the earlier root run also lacked staged conformance inputs.
+
+Independent GPT correctness review found no blocker. Independent GPT performance review prefers this implementation but recommends ITERATE the performance validation. The author checked hashes, counts and findings. Claude Code was attempted with the required read-only command and exited with “Not logged in”; no Claude review occurred. [REVIEW.md](REVIEW.md) records both reviews. No PR or opt-in mode was created.
+
+The next useful check is a quiet-host repeat of the longer ALU, accepted heap and mapped compile cases against both baselines. Retain the false-positive resource checks. [REPRODUCE.md](REPRODUCE.md) gives the commands. [The previous report](REPORT-before-hint-reuse.md) preserves the capacity-only results.

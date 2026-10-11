@@ -1,0 +1,21 @@
+{
+  "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+  "command": [
+    "claude",
+    "--bare",
+    "-p",
+    "Conduct an independent read-only review of correctness, performance, benchmarks and complex changes for direct SIMD map code capacity. Repository source is d6bca7168. Read experiments/direct-simd-map/results/hint-checks/final-source.diff for the change against previous capacity commit1ca658021. Inspect direct_map32_capacity.go, hints.go, compile.go, relevant native planner/emitter and tests under src/core/compiler/backend/railshot/amd64. Inspect final raw benchmark manifests and benchstat in experiments/direct-simd-map/results/hints-final-main and hints-final-before. Inspect untimed resource/profile/native/diagnostic evidence in results/hint-checks and results/native-hints if available; identify missing evidence explicitly. Do not use the old REPORT recommendation as evidence. Require specific findings with file locations, evidence, risks and suggested tests. Check packed hint masks and density/lease behavior, shape state/nesting, capacity limits, conservative rejected shapes, CPU gates, worker reset/copy order, allocations, matched benchmarking and common ALU scan cost. Prioritize measurable gains, low allocations and low regression risk. Distinguish static plans from native admission and nonsignificant timings from equivalence. Do not edit files or execute shell commands; use only Read, Glob and Grep. Report whether KEEP, ITERATE or REJECT is supported by the supplied evidence.",
+    "--model",
+    "opus",
+    "--effort",
+    "high",
+    "--tools",
+    "Read,Glob,Grep",
+    "--disallowedTools",
+    "mcp__*",
+    "--permission-mode",
+    "dontAsk",
+    "--output-format",
+    "text"
+  ]
+}

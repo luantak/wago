@@ -1,0 +1,132 @@
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  182020	      6186 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   50112	     22032 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   60789	     19591 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   38778	     31609 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32CompileHeap/i32         	  113641	     11270 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/f32         	  103460	     15971 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/rejected    	   80356	     18764 ns/op	   12520 B/op	      30 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  203833	      5387 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   57009	     19210 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   62605	     18275 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   37525	     30844 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32CompileHeap/i32         	  110576	     10495 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/f32         	  117927	     12032 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/rejected    	  140692	     12488 ns/op	   12520 B/op	      30 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  220917	      5279 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   69430	     17500 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   67176	     17257 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   40209	     30370 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32CompileHeap/i32         	  116872	     14986 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/f32         	  108140	      9349 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/rejected    	  147654	      7593 ns/op	   12520 B/op	      30 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  223666	      5091 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   80570	     16133 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   75009	     17239 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   41502	     29592 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32CompileHeap/i32         	  118186	      9632 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/f32         	  110773	     16871 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/rejected    	   71620	     15121 ns/op	   12520 B/op	      30 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  183752	     11626 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   34201	     30113 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   61963	     19252 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   37200	     31354 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32CompileHeap/i32         	  132741	     11137 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/f32         	   59736	     19912 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/rejected    	  143982	      7968 ns/op	   12520 B/op	      30 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  128454	     10026 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   45042	     26736 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   45506	     24125 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   43358	     27261 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32CompileHeap/i32         	  132652	      9383 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/f32         	  138010	      8907 ns/op	   13096 B/op	      30 allocs/op
+BenchmarkDirectMap32CompileHeap/rejected    	  165936	      7049 ns/op	   12520 B/op	      30 allocs/op
+PASS

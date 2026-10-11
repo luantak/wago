@@ -1,0 +1,84 @@
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  112200	      5553 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   36871	     16338 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   38458	     16593 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   18382	     30492 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  112347	      5622 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   39806	     16154 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   36650	     16041 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   18685	     30370 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  109050	      5743 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   29599	     18530 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   28148	     18225 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   18804	     30237 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	  103554	      6150 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   30117	     18845 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   34425	     19253 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   17899	     39323 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	   57715	     10767 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   21273	     38760 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   20420	     30430 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   10000	     52885 ns/op	    9456 B/op	      11 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32ALUHints 	   99519	      6112 ns/op	      32 B/op	       1 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Compile/false         	   32601	     20542 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/true          	   33328	     18416 ns/op	   12072 B/op	      29 allocs/op
+BenchmarkDirectMap32Compile/alu           	   16502	     35380 ns/op	    9456 B/op	      11 allocs/op
+PASS

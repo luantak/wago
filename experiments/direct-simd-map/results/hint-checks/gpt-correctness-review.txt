@@ -1,0 +1,9 @@
+Independent read-only correctness review by GPT-6 Astra. Diff 1ca658021..eea214d06, with final tests at a9698ff06. No blocking correctness findings.
+
+Density uses bits 0-8, map counts 9-14, lease 15. Density writes preserve other fields. The combined map count is bounded at four. Serial and parallel scans retain the packed value. Nested loops restore prior state and invalidate the parent; blocks and ifs invalidate the current shape. Scan errors still stop compilation.
+
+Memory, CPU, custom, GC and EH gates remain in capacity calculation. The hint is a conservative sizing shape and does not authorize SIMD emission. False-positive reserve is bounded at 2 KiB/function and 1 MiB/initial module image. Worker encoder growth follows copy of the previous function; resetting length before growth is safe. Later scratch reset retains capacity and restores emission state. No new slices, maps or pointer-owned metadata were added.
+
+Optional gaps were addressed at a9698ff06: mixed counts, density saturation, lease before/after maps, CPU filter, inner and sibling loops, and scalar output after unsupported xor-zero arithmetic received reserve. No new findings. Allocation and timing conclusions depend on the author's measurements. Reviewer ran no tests, builds, profiles or benchmarks and made no edits.
+
+Final read-only follow-up at d6bca7168: no correctness blockers. Shape tracking now occurs inside existing successful immediate-free classification, preserving NOP/mul shape flags and one density increment each. Physical-event and nested-loop behavior is unchanged. Resource fixtures check unsupported XOR arithmetic emits no SIMD; the four-loop512-byte fixture measures the maximum function reserve near a mapping boundary. Hint corpus evidence separates sizing reserve and full static plans; neither proves native admission. Resource output is measurement, not a limit assertion. Reviewer ran no CPU-heavy work or edits.

@@ -1,0 +1,16 @@
+{
+  "commit": "a9698ff0662c04d275a019dd4cb218ce02e98d77",
+  "diff": "diff --git a/src/core/compiler/backend/railshot/amd64/hints.go b/src/core/compiler/backend/railshot/amd64/hints.go\nindex f1d390b60..91afc1d2d 100644\n--- a/src/core/compiler/backend/railshot/amd64/hints.go\n+++ b/src/core/compiler/backend/railshot/amd64/hints.go\n@@ -1225,20 +1225,6 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt\n \t\t\tif s.map32Shape != 0 && label == 0 {\n \t\t\t\ts.map32Shape |= map32HintBranch\n \t\t\t}\n-\t\tcase 0x01: // nop: scalar oracle and a known planner rejection\n-\t\t\tif s.map32Shape != 0 {\n-\t\t\t\ts.map32Shape |= map32HintInvalid\n-\t\t\t}\n-\t\t\ts.noteImmediateFreeOp()\n-\t\tcase 0x6c, 0x94: // scalar multiply, also used by the capacity estimate\n-\t\t\tif s.map32Shape != 0 {\n-\t\t\t\tif op == 0x6c {\n-\t\t\t\t\ts.map32Shape |= map32HintMulI32\n-\t\t\t\t} else {\n-\t\t\t\t\ts.map32Shape |= map32HintMulF32\n-\t\t\t\t}\n-\t\t\t}\n-\t\t\ts.noteImmediateFreeOp()\n \t\tcase 0x00, 0x0f: // unreachable, return\n \t\t\ts.h.flags.set(hintHasControlFlow)\n \t\t\ts.entryPrefix = false\n@@ -1320,6 +1306,16 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt\n \t\t\ts.h.flags.set(hintModuleEH)\n \t\tdefault:\n \t\t\tif _, ok := wasm.ImmediateFreeInstructionKind(op); ok {\n+\t\t\t\tif s.map32Shape != 0 {\n+\t\t\t\t\tswitch op {\n+\t\t\t\t\tcase 0x01:\n+\t\t\t\t\t\ts.map32Shape |= map32HintInvalid\n+\t\t\t\t\tcase 0x6c:\n+\t\t\t\t\t\ts.map32Shape |= map32HintMulI32\n+\t\t\t\t\tcase 0x94:\n+\t\t\t\t\t\ts.map32Shape |= map32HintMulF32\n+\t\t\t\t\t}\n+\t\t\t\t}\n \t\t\t\ts.noteImmediateFreeOp()\n \t\t\t\tbreak\n \t\t\t}\n",
+  "samples": 6,
+  "duration": "500ms",
+  "cpu": 6,
+  "regex": [
+    "^BenchmarkDirectMap32ALUHints$",
+    "^BenchmarkDirectMap32Compile$/(false|true|alu)$"
+  ],
+  "binaries": {
+    "main": "1321ec8154ad0fb3d7c6a547e1ecbd7e7e6f7fae9e437268a781ad18d9af8c2f",
+    "first": "a814dca60727309b81e80a90120ab132aaaafd6d92a69b5925879e8879e32b9e",
+    "default": "b1ac3358035a47539ce1dd495d344a08ef30f3da13cdcf70b91bba195bdb4edf"
+  }
+}

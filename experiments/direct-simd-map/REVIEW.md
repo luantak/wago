@@ -1,5 +1,23 @@
 # Independent reviews
 
+## Hint reuse follow-up
+
+Final source: `d6bca7168`. Baselines: main `cea8f83f1` and previous capacity `1ca658021`. GPT-6 Astra reviewed correctness in an independent context. GPT-6.1 Sol reviewed performance in an independent context. Both used actual source, tests, diffs and evidence, stayed read-only, and ran no CPU-heavy work during timings. The author checked their findings.
+
+The correctness review found no blocker. It checked packed density/map/lease fields, saturation, loop nesting, scan errors, CPU/memory/options gates, bounded reserve, worker copy/reset order and full native admission. Optional gaps were addressed with mixed packing, lease/saturation, nested/sibling loops and a rejected XOR-zero shape that receives reserve but keeps scalar results. The final default-arm layout preserves density increments and shape updates. Focused tests pass.
+
+The performance review recommends **ITERATE performance validation**, with hint reuse as the preferred implementation. The capacity helper now reads retained counts and no longer repeats decoding/type construction/planning. Separate profiles show helper samples falling 9.38%→0.29%. This proves neither net compile speed nor ALU equality. The final layout retains a small shape check in the existing immediate-free path.
+
+The reviewer checked all 64 backend and six public rows in the final-main comparison, and all seven backend and six public rows in the one-second previous-capacity comparison. Every row has six samples. Source/input/harness hashes and available binaries match. The saved main backend binary also matches its record. The main public binary has only its runner hash because it was replaced before independent checking. All seven native/input artifacts match previous capacity.
+
+Allocation counts stay equal to main and previous capacity. Accepted heap compilation is 13,096 bytes / 30 allocations; public compilation is 23,073 bytes / 104 allocations. The final-main heap f32 increase, +66.28%, p=0.041, remains a concern. All seven longer backend comparisons with previous capacity have p≥0.589; no improvement or equivalence is proved. Raw timing variation and observed unrelated host work are disclosed. Public one-call timing proves no gain.
+
+The reviewer verified the conservative storage trade: one rejected shape adds 512 bytes to heap staging; four add 2,048 bytes and an extra compiler-arena page. Native code and allocation counts stay equal. The executable-page report is a projection from live bytes, separate from compiler arena capacity. Combined corpus evidence has 12 hinted functions / 23 hints / 11,776 reserve bytes before caps in 124 modules. Eleven hinted functions have no static plan. These are sizing/static counts, not native admission. Hint header and sidecar storage stay equal.
+
+The full diagnostic backend has 24 matching top-level failures / 86 failing names with no new names. Full CI remains unproved. The next useful check is a quiet-host repeat of longer ALU, heap and mapped compile cases against both baselines. Resource cases should remain as storage checks. Review records, source diff, profiles and author verification are in `results/hint-checks/`.
+
+Claude Code was attempted twice this follow-up from the repository root with the exact read-only command required by the user. The final prompt provides source/diff/test and raw evidence paths, requests specific locations, evidence, risks and suggested tests, and omits the author's recommendation. Both attempts exited 1 with `Not logged in · Please run /login`. No Claude review occurred. Final request/output: `results/hint-checks/claude-final-request.json` and `claude-final-review.txt`.
+
 ## Capacity follow-up
 
 The final capacity source is `66d6c445b39e9f7f6f6042b7c9d5262399587d5a`. The latest-main merge is `f62d4ca2d1a1aae62563b03b0c9ed3b522e1c05b`; it adds only the same upstream host change as main. The correctness reviewer checked the merge and found no new interaction. Compiler and map benchmark files are unchanged. GPT-6 Astra reviewed correctness in an independent context. GPT-6.1 Sol reviewed performance in an independent context. Both reviews were read-only and used the actual source, tests, diff, and raw evidence. The author verified their findings.

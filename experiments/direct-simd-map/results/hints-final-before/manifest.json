@@ -1,0 +1,73 @@
+{
+  "baseline": "1ca6580210310660df9790083edf9d83dd323027",
+  "experiment": "d6bca7168c33a25f50e831140d1c8c39c98b78cf",
+  "cpu": 6,
+  "features_backend": "SSSE3|SSE4.1|SSE4.2|AVX",
+  "features_public": "unchanged detected host features on both versions",
+  "features_existing_sum": "unchanged backend default AMD64ModernBaseline|BMI2 on both versions",
+  "backend_regex": [
+    "^BenchmarkDirectMap32ALUHints$",
+    "^BenchmarkDirectMap32Compile$/(false|true|alu)$",
+    "^BenchmarkDirectMap32CompileHeap$/(i32|f32|rejected)$"
+  ],
+  "samples": 6,
+  "duration": "1s",
+  "environment": {
+    "GOMAXPROCS": "1",
+    "GOFLAGS": "-buildvcs=false",
+    "WAGO_SPEC_INTERPRETER": "/home/jtenner/Projects/wago/.tools/spec-interpreter-9d36019973201a19f9c9ebb0f10828b2fe2374aa/wasm",
+    "WAGO_SPEC_INTERPRETER_REVISION": "9d36019973201a19f9c9ebb0f10828b2fe2374aa",
+    "DIRECT_MAP32_ROOT": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "DIRECT_MAP32_YOSYS": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/corpus/workloads/applications/yosys/yosys.wasm",
+    "DIRECT_MAP32_INPUTS": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/native-candidate"
+  },
+  "sources": {
+    "src/core/compiler/backend/railshot/amd64/direct_map32.go": "5818dfe1d85047403a9809bc4b749d9c39f548e697b31360353db44e6c261bf8",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_capacity.go": "40c946f05d20a98264dd875e25ca28aa2d5534c993addb2bfe2067092b90b01d",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_capacity_test.go": "66d4999ef426869ac306940f394ab7dcf52a99deeaae4eb4662d59c521230a13",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_corpus_test.go": "9a4173a2d1562d0f5ad4ea91c47e7a9710b7f0a773f0d0b95dafe6342530c27a",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_edges_test.go": "0d01814d5fda56a6b7c09bcefc7be7aa8f86b41cd6de7fd51e0d016a40e9d310",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_hint_corpus_test.go": "525735275724499586e08c432dc48ac884f29f2c367a7f7e92306498f8503ca2",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_profile_test.go": "e0c2b7e2a567c412b6bb7dd218b04f07f6d94802c274ce424ddcc6cb864b11b5",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_qualification_test.go": "bc1f608ce58f1f06b6378747e318572f852345a3d94dd8ba654ac89e4b9c2789",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_resources_test.go": "a2f71f79d1af1661127a60f9a0b2aaad995609074db375a85b31ec226f8a419e",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_test.go": "474dae927baa5c0557ef2fd56297841ad70ec2d7e8acbc61cbf9b943df485d5f",
+    "src/wago/direct_map32_bench_test.go": "28e8e8d6e25b1a7decc2fa2e7ffcb94567a667d0bd90caa4e058109b9ac07424",
+    "src/core/compiler/backend/railshot/amd64/vector_map_loop_plan.go": "e09c54e2378e1395ffccf97d6bef2437ecef02dbf24b49a75a490b02831b460c",
+    "src/core/compiler/backend/railshot/amd64/vector_map_loop_emit.go": "883cdd3d899d630ee3840d3dfb8d0de4a01a33065b8fa47cd99cdb62f914718f",
+    "src/core/compiler/backend/railshot/amd64/compile.go": "7c6a5b7eeea461c4c02f58d3fdf32c959b654c91d9a79f62dcdce485fbbc1ac7",
+    "src/core/compiler/backend/railshot/amd64/hints.go": "6f33667b08ecab492f85b2bd968878679a5b2d9668968cacc1a353128087264e"
+  },
+  "baseline_sources": {
+    "src/core/compiler/backend/railshot/amd64/direct_map32.go": "5818dfe1d85047403a9809bc4b749d9c39f548e697b31360353db44e6c261bf8",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_capacity.go": "4fb766bd66dbab7819c5763d417343f9776bf8025597784992de3232bfe06916",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_capacity_test.go": "a8c56dd609d2dcee5cfca14667cd70003e917e161cde044e14c197fd992cfee7",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_corpus_test.go": "9a4173a2d1562d0f5ad4ea91c47e7a9710b7f0a773f0d0b95dafe6342530c27a",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_edges_test.go": "0d01814d5fda56a6b7c09bcefc7be7aa8f86b41cd6de7fd51e0d016a40e9d310",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_profile_test.go": "e0c2b7e2a567c412b6bb7dd218b04f07f6d94802c274ce424ddcc6cb864b11b5",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_qualification_test.go": "bc1f608ce58f1f06b6378747e318572f852345a3d94dd8ba654ac89e4b9c2789",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_resources_test.go": "3c56ce54bf1a51c3cf5e61f4ca55733a6d6d02f533d4b77450f2ddc5f247d285",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_test.go": "474dae927baa5c0557ef2fd56297841ad70ec2d7e8acbc61cbf9b943df485d5f",
+    "src/wago/direct_map32_bench_test.go": "28e8e8d6e25b1a7decc2fa2e7ffcb94567a667d0bd90caa4e058109b9ac07424",
+    "src/core/compiler/backend/railshot/amd64/vector_map_loop_plan.go": "e09c54e2378e1395ffccf97d6bef2437ecef02dbf24b49a75a490b02831b460c",
+    "src/core/compiler/backend/railshot/amd64/vector_map_loop_emit.go": "883cdd3d899d630ee3840d3dfb8d0de4a01a33065b8fa47cd99cdb62f914718f",
+    "src/core/compiler/backend/railshot/amd64/compile.go": "bed1a567272eca731e1484cfdaead084cd309445137679845f9fe40408e5ece4",
+    "src/core/compiler/backend/railshot/amd64/hints.go": "e95d0efa749cd45e59797671d7413cf0dc156dbd5a170228bdb361bad33c008d"
+  },
+  "inputs": {
+    "corpus/workloads/assemblyscript/blake-as-simd.wasm": "741e9c374db8d28e8b80b6f45498c54da648087319232e47322095401e5a33f4",
+    "corpus/workloads/polybench/jacobi-2d.wasm": "22bf77b0c5d1ef03d29d5a11aaffd704a6e3979c9e15ce3ae150ffcc0ca82bf1",
+    "corpus/workloads/applications/yosys/yosys.wasm": "7668d2963f8cc276ccd32980126dfddac961db1cd002cb93073506a694059493",
+    "experiments/direct-simd-map/results/native-candidate/map-false.wasm": "491af247b613a361a85f976349e3e53cd007b09f5b8f7824643dcedc810b640f",
+    "experiments/direct-simd-map/results/native-candidate/map-true.wasm": "4d262cb14123d0f09d1603fe2033bcb5ac4f5ce49a08dc15e8d97006f7d3be72"
+  },
+  "go_version": "go version go1.27.1 linux/amd64",
+  "go_environment": {
+    "CGO_ENABLED": "1",
+    "GOAMD64": "v1",
+    "GOARCH": "amd64",
+    "GOOS": "linux",
+    "GOTOOLCHAIN": "auto"
+  },
+  "harness_sha256": "b3000e042c6f27d67a1d2cc72d34f7c05b4623bfd6425b8a4653f8d8071fb6b3"
+}

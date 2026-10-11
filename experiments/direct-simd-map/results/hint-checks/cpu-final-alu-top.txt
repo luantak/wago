@@ -1,0 +1,91 @@
+File: candidate.test
+Build ID: b884cc0ca8c367fe5451ef52f03ea718c8ebb284
+Type: cpu
+Time: 2026-10-11 11:59:13 EDT
+Duration: 7.13s, Total samples = 6.89s (96.60%)
+Showing nodes accounting for 6.19s, 89.84% of 6.89s total
+Dropped 128 nodes (cum <= 0.03s)
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      6.84s 99.27%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.BenchmarkDirectMap32Compile.func2
+         0     0%     0%      6.84s 99.27%  testing.(*B).launch
+         0     0%     0%      6.84s 99.27%  testing.(*B).runN
+         0     0%     0%      6.08s 88.24%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.CompileModuleWith
+     0.03s  0.44%  0.44%      6.08s 88.24%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.compileModuleWith
+         0     0%  0.44%         4s 58.06%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.compileFunc
+     0.06s  0.87%  1.31%         4s 58.06%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.compileFuncAttempt
+         0     0%  1.31%      3.06s 44.41%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).emitRegABI
+         0     0%  1.31%      2.69s 39.04%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).runBody
+     0.01s  0.15%  1.45%      2.69s 39.04%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).scalarBody
+     0.14s  2.03%  3.48%      2.68s 38.90%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.(*ScalarState).CompileScalar
+     1.48s 21.48% 24.96%      1.49s 21.63%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.(*ScalarState).add
+     0.23s  3.34% 28.30%      1.49s 21.63%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.(*ScalarState).binary
+     0.02s  0.29% 28.59%      1.32s 19.16%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.computeModuleHintsWithWorkersResidencyPolicy
+     0.03s  0.44% 29.03%      1.26s 18.29%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.scanBodyBytesWithLoopIntConsts
+         0     0% 29.03%      1.26s 18.29%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.scanFuncBodyWithLoopIntConsts
+     0.66s  9.58% 38.61%      1.23s 17.85%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*byteBodyScanner).scanExpr
+     0.01s  0.15% 38.75%      0.94s 13.64%  syscall.RawSyscall6
+     0.93s 13.50% 52.25%      0.93s 13.50%  internal/runtime/syscall/linux.Syscall6
+         0     0% 52.25%      0.76s 11.03%  github.com/wago-org/wago/src/core/runtime.(*CodeBuffer).Close
+         0     0% 52.25%      0.76s 11.03%  github.com/wago-org/wago/src/core/runtime.munmap (inline)
+         0     0% 52.25%      0.76s 11.03%  syscall.(*mmapper).Munmap
+         0     0% 52.25%      0.76s 11.03%  syscall.Munmap (inline)
+     0.01s  0.15% 52.39%      0.75s 10.89%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).admitScalar
+         0     0% 52.39%      0.74s 10.74%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.AdmitScalarFunction
+     0.29s  4.21% 56.60%      0.74s 10.74%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.admitScalar
+         0     0% 56.60%      0.73s 10.60%  syscall.Syscall
+         0     0% 56.60%      0.73s 10.60%  syscall.munmap
+         0     0% 56.60%      0.52s  7.55%  runtime.mallocgc
+     0.42s  6.10% 62.70%      0.42s  6.10%  github.com/wago-org/wago/src/core/compiler/wasm.(*Reader).I32
+         0     0% 62.70%      0.37s  5.37%  runtime.newobject
+     0.35s  5.08% 67.78%      0.36s  5.22%  github.com/wago-org/wago/src/core/compiler/wasm.(*Reader).Byte (inline)
+         0     0% 67.78%      0.34s  4.93%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.newCompileScratch (inline)
+     0.30s  4.35% 72.13%      0.34s  4.93%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.(*ScalarState).release
+     0.01s  0.15% 72.28%      0.29s  4.21%  runtime.systemstack
+     0.27s  3.92% 76.20%      0.27s  3.92%  github.com/wago-org/wago/src/core/encoder/amd64.(*Asm).emit (inline)
+         0     0% 76.20%      0.26s  3.77%  github.com/wago-org/wago/src/core/encoder/amd64.(*Asm).MovReg64
+         0     0% 76.20%      0.26s  3.77%  github.com/wago-org/wago/src/core/runtime.NewCodeBuffer
+         0     0% 76.20%      0.26s  3.77%  github.com/wago-org/wago/src/core/runtime.mmapCodeRW (inline)
+         0     0% 76.20%      0.26s  3.77%  github.com/wago-org/wago/src/core/runtime.mmapRW
+     0.01s  0.15% 76.34%      0.26s  3.77%  syscall.(*mmapper).Mmap
+         0     0% 76.34%      0.26s  3.77%  syscall.Mmap (inline)
+     0.01s  0.15% 76.49%      0.25s  3.63%  syscall.Syscall6
+         0     0% 76.49%      0.25s  3.63%  syscall.mmap
+     0.22s  3.19% 79.68%      0.22s  3.19%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.ScalarOpcode
+         0     0% 79.68%      0.22s  3.19%  runtime.mallocgcSmallScanHeader
+         0     0% 79.68%      0.17s  2.47%  runtime.gcAssistAlloc
+         0     0% 79.68%      0.16s  2.32%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*byteScanReader).byte (inline)
+         0     0% 79.68%      0.16s  2.32%  runtime.gcAssistAlloc.func2
+         0     0% 79.68%      0.16s  2.32%  runtime.gcAssistAlloc1
+         0     0% 79.68%      0.16s  2.32%  runtime.gcDrainN
+     0.01s  0.15% 79.83%      0.16s  2.32%  runtime.makeslice
+         0     0% 79.83%      0.14s  2.03%  runtime.(*mcache).nextFree
+     0.01s  0.15% 79.97%      0.14s  2.03%  runtime.(*mcache).refill
+         0     0% 79.97%      0.14s  2.03%  runtime.deductAssistCredit
+     0.12s  1.74% 81.71%      0.12s  1.74%  runtime.memclrNoHeapPointers
+     0.11s  1.60% 83.31%      0.11s  1.60%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*byteBodyScanner).notePhysicalEvent
+     0.09s  1.31% 84.62%      0.10s  1.45%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.FoldBin
+         0     0% 84.62%      0.10s  1.45%  runtime.markroot
+         0     0% 84.62%      0.09s  1.31%  runtime.(*mcentral).cacheSpan
+     0.01s  0.15% 84.76%      0.08s  1.16%  runtime.scanObject
+         0     0% 84.76%      0.07s  1.02%  runtime.mallocgcSmallNoscan
+     0.07s  1.02% 85.78%      0.07s  1.02%  runtime.typePointers.next
+     0.02s  0.29% 86.07%      0.06s  0.87%  runtime.bulkBarrierPreWrite
+         0     0% 86.07%      0.06s  0.87%  runtime.markroot.func1
+     0.04s  0.58% 86.65%      0.06s  0.87%  runtime.scanblock
+         0     0% 86.65%      0.06s  0.87%  runtime.scanstack
+     0.01s  0.15% 86.79%      0.05s  0.73%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).emitTrapStubs
+     0.05s  0.73% 87.52%      0.05s  0.73%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.(*ScalarState).node (inline)
+     0.05s  0.73% 88.24%      0.05s  0.73%  github.com/wago-org/wago/src/core/compiler/backend/railshot/shared.(*ScalarState).pop (inline)
+         0     0% 88.24%      0.05s  0.73%  runtime.deductSweepCredit
+         0     0% 88.24%      0.05s  0.73%  runtime.mallocgcSmallScanNoHeader
+     0.03s  0.44% 88.68%      0.05s  0.73%  runtime.sweepone
+     0.01s  0.15% 88.82%      0.05s  0.73%  runtime.wbMove
+     0.01s  0.15% 88.97%      0.04s  0.58%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).opt (inline)
+     0.04s  0.58% 89.55%      0.04s  0.58%  github.com/wago-org/wago/src/core/compiler/wasm.ImmediateFreeInstructionKind (inline)
+     0.01s  0.15% 89.70%      0.04s  0.58%  github.com/wago-org/wago/src/core/encoder/amd64.(*Asm).memOp
+         0     0% 89.70%      0.04s  0.58%  runtime.(*mcentral).grow
+         0     0% 89.70%      0.04s  0.58%  runtime.(*mheap).alloc
+         0     0% 89.70%      0.04s  0.58%  runtime.(*mheap).alloc.func1
+     0.01s  0.15% 89.84%      0.04s  0.58%  runtime.(*mheap).allocSpan
+         0     0% 89.84%      0.04s  0.58%  runtime.markrootBlock
+         0     0% 89.84%      0.04s  0.58%  runtime.pcvalue

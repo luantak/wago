@@ -1,0 +1,23 @@
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+                       │ /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hints-dispatch-trial/first.txt │ /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hints-dispatch-trial/dispatch.txt │
+                       │                                                         sec/op                                                         │                                               sec/op                                                vs base               │
+DirectMap32ALUHints                                                                                                               7.384µ ± 155%                                                                                        5.820µ ± 100%        ~ (p=0.589 n=6)
+DirectMap32Compile/alu                                                                                                            50.06µ ±  44%                                                                                        36.30µ ±  91%        ~ (p=0.699 n=6)
+geomean                                                                                                                           19.23µ                                                                                               14.54µ         -24.40%
+
+                       │ /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hints-dispatch-trial/first.txt │ /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hints-dispatch-trial/dispatch.txt │
+                       │                                                          B/op                                                          │                                               B/op                                                 vs base                │
+DirectMap32ALUHints                                                                                                                  32.00 ± 0%                                                                                          32.00 ± 0%       ~ (p=1.000 n=6) ¹
+DirectMap32Compile/alu                                                                                                             9.234Ki ± 0%                                                                                        9.234Ki ± 0%       ~ (p=1.000 n=6) ¹
+geomean                                                                                                                              550.1                                                                                               550.1       +0.00%
+¹ all samples are equal
+
+                       │ /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hints-dispatch-trial/first.txt │ /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hints-dispatch-trial/dispatch.txt │
+                       │                                                       allocs/op                                                        │                                             allocs/op                                              vs base                │
+DirectMap32ALUHints                                                                                                                  1.000 ± 0%                                                                                          1.000 ± 0%       ~ (p=1.000 n=6) ¹
+DirectMap32Compile/alu                                                                                                               11.00 ± 0%                                                                                          11.00 ± 0%       ~ (p=1.000 n=6) ¹
+geomean                                                                                                                              3.317                                                                                               3.317       +0.00%
+¹ all samples are equal

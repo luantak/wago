@@ -1,0 +1,348 @@
+[
+  {
+    "output": "resources-main.txt",
+    "command": [
+      "go",
+      "test",
+      "-tags=wago_codegenstats",
+      "-count=1",
+      "-v",
+      "./src/core/compiler/backend/railshot/amd64",
+      "-run",
+      "^TestDirectMap32CapacityResources$"
+    ],
+    "cwd": "/tmp/wago-map-hints-main",
+    "exit_code": 0
+  },
+  {
+    "output": "resources-before.txt",
+    "command": [
+      "go",
+      "test",
+      "-tags=wago_codegenstats",
+      "-count=1",
+      "-v",
+      "./src/core/compiler/backend/railshot/amd64",
+      "-run",
+      "^TestDirectMap32CapacityResources$"
+    ],
+    "cwd": "/tmp/wago-map-hints-before",
+    "exit_code": 0
+  },
+  {
+    "output": "resources-final.txt",
+    "command": [
+      "go",
+      "test",
+      "-tags=wago_codegenstats",
+      "-count=1",
+      "-v",
+      "./src/core/compiler/backend/railshot/amd64",
+      "-run",
+      "^TestDirectMap32CapacityResources$"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "hint-corpus.txt",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./src/core/compiler/backend/railshot/amd64",
+      "-run",
+      "^TestDirectMap32HintCorpus$"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "native-final.txt",
+    "command": [
+      "go",
+      "test",
+      "-tags=wago_codegenstats",
+      "-count=1",
+      "-v",
+      "./src/core/compiler/backend/railshot/amd64",
+      "-run",
+      "^TestDirectMap32(Artifacts|RealNative)$"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "backend-main.json",
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-tags=wago_codegenstats,wago_regallocdebug",
+      "-count=1",
+      "./src/core/compiler/backend/railshot/amd64"
+    ],
+    "cwd": "/tmp/wago-map-hints-main",
+    "exit_code": 1
+  },
+  {
+    "output": "backend-final.json",
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-tags=wago_codegenstats,wago_regallocdebug",
+      "-count=1",
+      "./src/core/compiler/backend/railshot/amd64"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 1
+  },
+  {
+    "output": "cpu-before-false.txt",
+    "command": [
+      "taskset",
+      "-c",
+      "6",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/main.test",
+      "-test.run",
+      "^$",
+      "-test.bench",
+      "^BenchmarkDirectMap32Compile$/false$",
+      "-test.benchtime",
+      "3s",
+      "-test.cpuprofile",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-before-false.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/compiler/backend/railshot/amd64",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-before-false-top.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/main.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-before-false.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-before-false-capacity.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "-focus=directMap32CodeReserve|inspectRegionLoop",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/main.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-before-false.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-before-alu.txt",
+    "command": [
+      "taskset",
+      "-c",
+      "6",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/main.test",
+      "-test.run",
+      "^$",
+      "-test.bench",
+      "^BenchmarkDirectMap32Compile$/alu$",
+      "-test.benchtime",
+      "3s",
+      "-test.cpuprofile",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-before-alu.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/compiler/backend/railshot/amd64",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-before-alu-top.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/main.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-before-alu.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-before-alu-capacity.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "-focus=directMap32CodeReserve|inspectRegionLoop",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/main.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-before-alu.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-final-false.txt",
+    "command": [
+      "taskset",
+      "-c",
+      "6",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "-test.run",
+      "^$",
+      "-test.bench",
+      "^BenchmarkDirectMap32Compile$/false$",
+      "-test.benchtime",
+      "3s",
+      "-test.cpuprofile",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-final-false.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/compiler/backend/railshot/amd64",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-final-false-top.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-final-false.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-final-false-capacity.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "-focus=directMap32CodeReserve|inspectRegionLoop",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-final-false.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-final-alu.txt",
+    "command": [
+      "taskset",
+      "-c",
+      "6",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "-test.run",
+      "^$",
+      "-test.bench",
+      "^BenchmarkDirectMap32Compile$/alu$",
+      "-test.benchtime",
+      "3s",
+      "-test.cpuprofile",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-final-alu.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/compiler/backend/railshot/amd64",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-final-alu-top.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-final-alu.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "cpu-final-alu-capacity.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-top",
+      "-cum",
+      "-focus=directMap32CodeReserve|inspectRegionLoop",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/cpu-final-alu.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "output": "heap-final.txt",
+    "command": [
+      "taskset",
+      "-c",
+      "6",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "-test.run",
+      "^$",
+      "-test.bench",
+      "^BenchmarkDirectMap32CompileHeap$/i32$",
+      "-test.benchtime",
+      "100x",
+      "-test.memprofilerate",
+      "1",
+      "-test.memprofile",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/heap-final.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/compiler/backend/railshot/amd64",
+    "exit_code": 0
+  },
+  {
+    "output": "heap-final-growth.txt",
+    "command": [
+      "go",
+      "tool",
+      "pprof",
+      "-traces",
+      "-alloc_objects",
+      "-focus=imm32|growPreserving",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/candidate.test",
+      "/home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/hint-checks/heap-final.pprof"
+    ],
+    "cwd": "/home/jtenner/.codex/worktrees/direct-simd-map/wago",
+    "exit_code": 0
+  },
+  {
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-v",
+      "./src/core/compiler/backend/railshot/amd64",
+      "-run",
+      "^TestDirectMap32HintCorpus$"
+    ],
+    "output": "hint-corpus-additional.txt",
+    "environment": {
+      "DIRECT_MAP32_CORPUS": "experiments/direct-simd-map/downloads",
+      "DIRECT_MAP32_HINT_COVERAGE": "experiments/direct-simd-map/results/hint-checks/hint-corpus-additional.json",
+      "GOMAXPROCS": "1"
+    },
+    "exit_code": 0
+  }
+]

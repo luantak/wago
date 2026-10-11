@@ -1,0 +1,11 @@
+Read-only ALU source and assembly investigation.
+
+The fixture has 512 i32.const/i32.add pairs, no memory, no locals and no loop. Previous mapped compile medians were +3.80% versus main and +5.82% versus pre-capacity code. It skipped full map recognition but paid an unconditional reserve helper call and a larger copied funcHintView. Static inspection found option argument work and a 0xfe8-byte helper frame before rejection.
+
+Current binary at a9698ff06 verifies the transient field is removed. Packed map count is checked before the reserve call; ALU count zero skips it. The helper is now 367 code bytes with a 0x10 frame. compileFuncAttempt remains 23150 bytes, matching main.
+
+Hint scan wrapper: main 2251 bytes/frame 0x518; old capacity 2325/0x528; new 2293/0x520. scanExpr: main 8305 bytes; new 8837. Shape collection changes the instruction switch and density mask, so shared scan/code-layout effects remain possible. Static sizes do not establish timing causation. Root will run isolated hint and full ALU compile benchmarks and CPU profiles. Investigator did no builds, tests, profiles, benchmarks or edits.
+
+Final dispatch checks at d6bca7168: the initial hint version added an extra conditional branch to the constant path and an extra jump to the add path after notePhysicalEvent. A moved physical-event trial restored scanExpr but added one conditional branch to both physical-event paths. Adjacent opcode grouping produced the same physical-event and scanExpr sizes and did not improve those paths.
+
+The selected final default-arm source restores main dispatch counts: scanExpr has six conditional branches and no extra jump for both ALU opcodes. notePhysicalEvent has five conditionals and one jump, with the same 569-byte function as main. Constants bypass shape work. After immediate-free lookup, add executes three extra instructions (load shape, test, conditional skip). The final wrapper is 2293 bytes with frame0x520; scanExpr8748 bytes. This remains a small shared scan cost, not a statically free path. Trial results have substantial variance; unrelated Go, TinyGo and qemu processes were observed. No timing-equivalence claim follows from the layout change. All investigator work was read-only disassembly/source inspection.

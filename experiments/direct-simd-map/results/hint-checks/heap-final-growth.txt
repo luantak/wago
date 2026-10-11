@@ -1,0 +1,6 @@
+Focus expression matched no samples
+File: candidate.test
+Build ID: b884cc0ca8c367fe5451ef52f03ea718c8ebb284
+Type: alloc_objects
+Time: 2026-10-11 11:59:21 EDT
+-----------+-------------------------------------------------------

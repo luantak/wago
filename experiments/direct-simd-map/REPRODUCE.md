@@ -2,33 +2,35 @@
 
 Use the experiment repository root. Requirements: Linux AMD64, Go 1.27.1, Python 3, `taskset`, GNU `objdump`, and `benchstat`. Use a CPU with SSE4.1 and AVX for the matched modern-mask measurements. The original run uses Ryzen 7 8845HS logical CPU 6. The script uses CPU 6 if available; otherwise it uses the first available CPU. It runs each version in serial, alternates their order, uses `GOMAXPROCS=1`, and excludes build time from benchmark time. Do not run other CPU-heavy work at the same time.
 
-Create a disposable main worktree. The script copies only experiment test harnesses into it; production code remains at the baseline commit.
+The final hint reuse source is `d6bca7168c33a25f50e831140d1c8c39c98b78cf`. Use that commit or a documentation successor with matching source hashes. Create disposable baseline worktrees. The script copies the matched benchmark harness into them.
 
 ```bash
-git worktree add --detach /tmp/wago-direct-map-main cea8f83f101fbdd0fcad634e9c7faad0377b676e
+git worktree add --detach /tmp/wago-map-hints-main cea8f83f101fbdd0fcad634e9c7faad0377b676e
+git worktree add --detach /tmp/wago-map-hints-before 1ca658021
 python3 experiments/direct-simd-map/run.py final \
-  --baseline /tmp/wago-direct-map-main --label reproduce-capacity-main --samples 6
+  --baseline /tmp/wago-map-hints-main --label reproduce-hints-main --samples 6
+python3 experiments/direct-simd-map/run.py final \
+  --baseline /tmp/wago-map-hints-before --label reproduce-hints-before --samples 6 \
+  --duration 1s \
+  --backend-regex '^BenchmarkDirectMap32ALUHints$' \
+  --backend-regex '^BenchmarkDirectMap32Compile$/(false|true|alu)$' \
+  --backend-regex '^BenchmarkDirectMap32CompileHeap$/(i32|f32|rejected)$'
+python3 experiments/direct-simd-map/verify-hints.py
 ```
 
-To isolate the capacity change from SIMD emission, repeat against the previous experiment:
+`hints-final-main` is the final full comparison: 64 backend cases and six public cases, six alternating samples, 150 ms per case. `hints-final-before` is the final focused comparison against the previous capacity build: seven backend cases and six public cases, six alternating samples, one second per case. Both versions have the same host code. `hints-main` and `hints-before` measure the first hint implementation at `a9698ff06`; they are not final layout results. `hints-dispatch-trial`, `hints-group-trial`, and `hints-default-trial` preserve layout trials with source diffs and binary hashes. Some trial and final timing rows have large outliers. Other Go, TinyGo and QEMU work was observed on the host. Do not interpret a nonsignificant timing result as proof of equal speed.
 
-```bash
-git worktree add --detach /tmp/wago-direct-map-before-capacity 9b0e87570
-git checkout --detach 66d6c445b39e9f7f6f6042b7c9d5262399587d5a
-python3 experiments/direct-simd-map/run.py final \
-  --baseline /tmp/wago-direct-map-before-capacity --label reproduce-capacity-before --samples 6
-git checkout codex/direct-simd-map
-```
+Run the untimed verification script only after all ordinary timings stop. It measures accepted, rejected, false-positive and four-loop page-boundary storage on main, previous capacity and final code. It collects hint corpus counts, unchanged native artifacts, full backend failure names, CPU profiles and an allocation profile. It removes the copied experiment tests from the disposable main worktree before testing original main. Experiment tests are separately checked on the candidate. Its fixed worktree paths match the commands above. It preserves every command exit; full diagnostic suite failures do not stop evidence collection. Profiles use `main.test` from the previous-capacity comparison and `candidate.test` from final source. Profile timings are excluded from normal comparisons.
 
-Use merge commit `f62d4ca2d1a1aae62563b03b0c9ed3b522e1c05b` for the latest-main comparison. It contains the final capacity source from `66d6c445b39e9f7f6f6042b7c9d5262399587d5a` plus the same upstream host-call change as latest main. For the isolated capacity comparison against `9b0e87570`, use `66d6c445b` so both versions use the same host code. A documentation-only successor with matching source hashes is also valid. `capacity-latest-main` and `capacity-before` are the authoritative final comparisons. Earlier capacity variants remain as diagnostic evidence.
+Earlier capacity comparisons are retained under `capacity-latest-main` and `capacity-before`. Their final source is `66d6c445b`, with upstream host merge `f62d4ca2d`. The pre-capacity experiment is `9b0e87570`. Their independent results and report are historical evidence in `REPORT-before-hint-reuse.md` and `REPORT-before-capacity.md`.
 
-The current harness closes every compile code image and includes heap staging. It also checks direct execution results after timing. Public tests use the same original exported Wasm fixtures from `results/native-candidate`. The script refuses to reuse a nonempty result directory. Select a new label for each run. Verify six rows for each benchmark case before using benchstat. Manifests identify both Git commits, source hashes (including capacity, compile, and hint code), Wasm input hashes, harness hash, feature masks, build settings, selected environment, Go version, and CPU affinity. Binary hashes are saved after completion. Source commits in older manifests may predate uncommitted test refinements; the recorded source hashes identify those runs.
+The current harness closes every compile code image and includes heap staging. It also checks direct execution results after timing. Public tests use the same original exported Wasm fixtures from `results/native-candidate`. The script refuses to reuse a nonempty result directory. Select a new label for each run. Verify six rows for each benchmark case before using benchstat. Manifests identify both Git commits, source hashes (including capacity, compile, and hint code), Wasm input hashes, harness hash, feature masks, case duration, build settings, selected environment, Go version, and CPU affinity. Binary hashes are saved after completion. Source commits in older manifests may predate uncommitted test refinements; the recorded source hashes identify those runs.
 
 To repeat only the final closed-image cases, use separate regexes for their different benchmark name depths:
 
 ```bash
 python3 experiments/direct-simd-map/run.py final \
-  --baseline /tmp/wago-direct-map-main --label reproduce-closed --samples 6 \
+  --baseline /tmp/wago-map-hints-main --label reproduce-closed --samples 6 \
   --backend-regex '^BenchmarkDirectMap32Compile' \
   --backend-regex '^BenchmarkDirectMap32Execute$/(false|true)$/8192$' \
   --backend-regex '^Benchmark(DirectMap32YosysExecute|LinearSumNoWrapAMD64)$/8192$' \
@@ -41,7 +43,7 @@ The threshold mode builds variants with count cutoffs 4, 8, 16, 32, and 64. It r
 
 ```bash
 python3 experiments/direct-simd-map/run.py thresholds \
-  --baseline /tmp/wago-direct-map-main --label reproduce-thresholds --samples 3
+  --baseline /tmp/wago-map-hints-main --label reproduce-thresholds --samples 3
 ```
 
 Run the focused correctness and source-position checks:
@@ -141,6 +143,6 @@ Saved evidence groups:
 The full backend/root failures and missing staged conformance inputs are retained. These files do not establish a passing full CI run. ARM64 has only cross-build evidence. Remove the disposable main worktree when finished:
 
 ```bash
-git worktree remove --force /tmp/wago-direct-map-main
-git worktree remove --force /tmp/wago-direct-map-before-capacity
+git worktree remove --force /tmp/wago-map-hints-main
+git worktree remove --force /tmp/wago-map-hints-before
 ```

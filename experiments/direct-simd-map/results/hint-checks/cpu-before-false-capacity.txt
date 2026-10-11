@@ -1,0 +1,36 @@
+File: main.test
+Build ID: 4bc5b036b95508fcd2861849344c08bbff1f430d
+Type: cpu
+Time: 2026-10-11 11:59:00 EDT
+Duration: 3.45s, Total samples = 3.41s (98.75%)
+Active filters:
+   focus=directMap32CodeReserve|inspectRegionLoop
+Showing nodes accounting for 0.46s, 13.49% of 3.41s total
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      0.46s 13.49%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.BenchmarkDirectMap32Compile.func1
+         0     0%     0%      0.46s 13.49%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.CompileModuleWith
+         0     0%     0%      0.46s 13.49%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.compileModuleWith
+         0     0%     0%      0.46s 13.49%  testing.(*B).launch
+         0     0%     0%      0.46s 13.49%  testing.(*B).runN
+     0.07s  2.05%  2.05%      0.39s 11.44%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.inspectRegionLoop
+     0.02s  0.59%  2.64%      0.32s  9.38%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.directMap32CodeReserve
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).body (inline)
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).bodyLoop
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).emitRegABI
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).runBody
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*fn).tryRegionLoop
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.compileFunc
+         0     0%  2.64%      0.14s  4.11%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.compileFuncAttempt
+     0.06s  1.76%  4.40%      0.12s  3.52%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*regionLoopPlan).local
+     0.10s  2.93%  7.33%      0.10s  2.93%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*regionLoopPlan).add (inline)
+     0.05s  1.47%  8.80%      0.07s  2.05%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*regionLoopPlan).integer
+     0.01s  0.29%  9.09%      0.07s  2.05%  github.com/wago-org/wago/src/core/compiler/wasm.ModuleInstructionClassifier.ClassifyInto (inline)
+     0.03s  0.88%  9.97%      0.06s  1.76%  github.com/wago-org/wago/src/core/compiler/wasm.classifyInstructionImmediateIntoWithWidths
+     0.04s  1.17% 11.14%      0.04s  1.17%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*regionLoopPlan).finish
+     0.04s  1.17% 12.32%      0.04s  1.17%  github.com/wago-org/wago/src/core/compiler/wasm.(*Reader).Byte (inline)
+         0     0% 12.32%      0.02s  0.59%  github.com/wago-org/wago/src/core/compiler/wasm.classifyExprOpAfterOpcodeWithWidths
+     0.01s  0.29% 12.61%      0.02s  0.59%  github.com/wago-org/wago/src/core/compiler/wasm.classifyMemArgBytes
+     0.01s  0.29% 12.90%      0.01s  0.29%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*regionLoopPlan).map32Invariant (inline)
+         0     0% 12.90%      0.01s  0.29%  github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64.(*regionLoopPlan).qualifyMap32
+     0.01s  0.29% 13.20%      0.01s  0.29%  github.com/wago-org/wago/src/core/compiler/wasm.(*Reader).U32
+     0.01s  0.29% 13.49%      0.01s  0.29%  github.com/wago-org/wago/src/core/compiler/wasm.(*reader).u32
