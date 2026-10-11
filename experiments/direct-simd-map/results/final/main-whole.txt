@@ -1,0 +1,66 @@
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/wago
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32WholeProgram/false/0         	    4336	     46762 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/16        	    3944	     48486 ns/op	   22466 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/8192      	    3804	     51960 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/0          	    3994	     47043 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/16         	    4359	     47395 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/8192       	    4135	     53146 ns/op	   22497 B/op	     104 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/wago
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32WholeProgram/false/0         	    3760	     43270 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/16        	    3865	     45982 ns/op	   22466 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/8192      	    4051	     49177 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/0          	    3991	     43721 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/16         	    4318	     43224 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/8192       	    3909	     46936 ns/op	   22497 B/op	     104 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/wago
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32WholeProgram/false/0         	    4057	     46197 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/16        	    3873	     45424 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/8192      	    4203	     48253 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/0          	    4390	     44582 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/16         	    4525	     43824 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/8192       	    4174	     51540 ns/op	   22498 B/op	     104 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/wago
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32WholeProgram/false/0         	    3829	     41988 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/16        	    4206	     42803 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/8192      	    3507	     50059 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/0          	    4318	     42564 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/16         	    4431	     45893 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/8192       	    3966	     47394 ns/op	   22498 B/op	     104 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/wago
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32WholeProgram/false/0         	    3314	     47767 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/16        	    4119	     48611 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/8192      	    3918	     52593 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/0          	    3992	     45718 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/16         	    4459	     45029 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/8192       	    3686	     51277 ns/op	   22497 B/op	     104 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/wago
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32WholeProgram/false/0         	    3940	     46394 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/16        	    4002	     45656 ns/op	   22465 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/false/8192      	    4099	     49685 ns/op	   22466 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/0          	    4238	     50321 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/16         	    4276	     47900 ns/op	   22497 B/op	     104 allocs/op
+BenchmarkDirectMap32WholeProgram/true/8192       	    3697	     50801 ns/op	   22497 B/op	     104 allocs/op
+PASS

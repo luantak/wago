@@ -1,0 +1,32 @@
+Total: 4251
+ROUTINE ======================== github.com/wago-org/wago/src/core/runtime.(*CodeBuffer).growPreserving in /home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/runtime/code_buffer.go
+       101        101 (flat, cum)  2.38% of Total
+         .          .    269:func (b *CodeBuffer) growPreserving(extra, preserveEnd int) error {
+         .          .    270:	if b == nil {
+         .          .    271:		return fmt.Errorf("jit: nil code buffer")
+         .          .    272:	}
+         .          .    273:	if b.closed {
+         .          .    274:		return fmt.Errorf("jit: code buffer is closed")
+         .          .    275:	}
+         .          .    276:	if b.sealed {
+         .          .    277:		return fmt.Errorf("jit: code buffer is sealed")
+         .          .    278:	}
+         .          .    279:	if extra < 0 || b.n > int(^uint(0)>>1)-extra {
+         .          .    280:		return fmt.Errorf("jit: code image size overflow")
+         .          .    281:	}
+         .          .    282:	need := b.n + extra
+         .          .    283:	if need <= len(b.mem) {
+         .          .    284:		return nil
+         .          .    285:	}
+         .          .    286:	capacity := len(b.mem) * 2
+         .          .    287:	if capacity < need {
+         .          .    288:		capacity = need
+         .          .    289:	}
+         .          .    290:	var mem []byte
+         .          .    291:	if b.heap {
+       101        101    292:		mem = make([]byte, capacity)
+         .          .    293:	} else {
+         .          .    294:		var err error
+         .          .    295:		mem, err = mmapCodeRW(capacity)
+         .          .    296:		if err != nil {
+         .          .    297:			return err

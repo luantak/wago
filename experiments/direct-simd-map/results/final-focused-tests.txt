@@ -1,0 +1,48 @@
+=== RUN   TestDirectMap32Corpus
+    direct_map32_corpus_test.go:23: corpus root not set
+--- SKIP: TestDirectMap32Corpus (0.00s)
+=== RUN   TestDirectMap32FullMemoryWrapAndOffsets
+--- PASS: TestDirectMap32FullMemoryWrapAndOffsets (0.00s)
+=== RUN   TestDirectMap32FastExecution
+--- PASS: TestDirectMap32FastExecution (0.00s)
+=== RUN   TestDirectMap32FloatRounding
+--- PASS: TestDirectMap32FloatRounding (0.00s)
+=== RUN   TestDirectMap32RealNative
+    direct_map32_edges_test.go:227: function=5011 selections=3 native=1345 frame=136 spills=0 reloads=3
+    direct_map32_edges_test.go:230: module=/home/jtenner/.codex/worktrees/direct-simd-map/wago/corpus/workloads/applications/yosys/yosys.wasm bytes=50197847 selections=3
+--- PASS: TestDirectMap32RealNative (1.12s)
+=== RUN   TestDirectMap32YosysExecution
+    direct_map32_edges_test.go:288: n=0 output SHA256=bef8baef7beb2c6fe0eb97eeae32b55b66b854763d27fce8aa6908bc9d4191c3
+    direct_map32_edges_test.go:288: n=1 output SHA256=cbdaa4449914fb72a860cf5c5a1e6198bc46044ac4204b0658ff95d426afa76c
+    direct_map32_edges_test.go:288: n=4 output SHA256=68cd99fc869fdea51aa59dd509d6b450391ddb11da6829d92815d22f6f456fdb
+    direct_map32_edges_test.go:288: n=8 output SHA256=23562b9b10964af19bf26efed6810c49a5285aaef16fdf51b2c1069701c725d3
+    direct_map32_edges_test.go:288: n=16 output SHA256=fd2edeea4e63ec02e7593c6baf81f0e187c0f3101ec2fbb03b93918a6a3ff93e
+    direct_map32_edges_test.go:288: n=17 output SHA256=90889ab61d442d3b2e1f8929c3af60082d1e0df2c2b210f3839e3ff4e6626f1c
+    direct_map32_edges_test.go:288: n=32 output SHA256=523701add17a651a47fa5f6a03158cbf02f9b65e2466592ec7050250eabd895a
+    direct_map32_edges_test.go:288: n=33 output SHA256=71d0f027f770c12142dfd67fe7f16279303157b312296624d1c011602409900f
+    direct_map32_edges_test.go:288: n=8192 output SHA256=72eee004c6f5bb1f29731b00d1f58be6d94d946ab0e640f31a53be6173e557fa
+--- PASS: TestDirectMap32YosysExecution (1.00s)
+=== RUN   TestDirectMap32OriginalSourcePositions
+--- PASS: TestDirectMap32OriginalSourcePositions (0.00s)
+=== RUN   TestDirectMap32RecognitionAllocations
+--- PASS: TestDirectMap32RecognitionAllocations (0.00s)
+=== RUN   TestDirectMap32PressureAndPinnedLocals
+--- PASS: TestDirectMap32PressureAndPinnedLocals (0.00s)
+=== RUN   TestDirectMap32StoresBeforeSuffixTrap
+--- PASS: TestDirectMap32StoresBeforeSuffixTrap (0.00s)
+=== RUN   TestDirectMap32IndexedMemoryRejection
+--- PASS: TestDirectMap32IndexedMemoryRejection (0.00s)
+=== RUN   TestDirectMap32LiveOperandPrefix
+--- PASS: TestDirectMap32LiveOperandPrefix (0.00s)
+=== RUN   TestDirectMap32Selection
+--- PASS: TestDirectMap32Selection (0.00s)
+=== RUN   TestDirectMap32Semantics
+--- PASS: TestDirectMap32Semantics (0.31s)
+=== RUN   TestDirectMap32Artifacts
+    direct_map32_test.go:242: fp=false module=758 function=758 frame=136 spills=0 reloads=0 selected=1
+    direct_map32_test.go:242: fp=true module=760 function=760 frame=136 spills=0 reloads=0 selected=1
+--- PASS: TestDirectMap32Artifacts (0.00s)
+=== RUN   TestDirectMap32Countdown
+--- PASS: TestDirectMap32Countdown (0.00s)
+PASS
+ok  	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	2.458s

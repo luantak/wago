@@ -1,0 +1,4 @@
+usage: run.py [-h] --baseline BASELINE [--samples SAMPLES] [--label LABEL]
+              [--backend-regex BACKEND_REGEX]
+              {thresholds,final}
+run.py: error: results directory is not empty: /home/jtenner/.codex/worktrees/direct-simd-map/wago/experiments/direct-simd-map/results/verified-closed; select a new --label

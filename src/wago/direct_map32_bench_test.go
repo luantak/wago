@@ -10,6 +10,14 @@ import (
 	"testing"
 )
 
+func TestDirectMap32PublicFeatureRecord(t *testing.T) {
+	f, ok := cachedAMD64CPUFeatures()
+	if !ok {
+		t.Fatal("CPU feature detection failed")
+	}
+	t.Logf("host-features=%#x selected-features=%#x", f, selectedAMD64CompileFeatures(f))
+}
+
 func BenchmarkDirectMap32WholeProgram(b *testing.B) {
 	dir := os.Getenv("DIRECT_MAP32_INPUTS")
 	if dir == "" {

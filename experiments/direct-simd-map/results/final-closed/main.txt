@@ -1,0 +1,42 @@
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Execute/false/8192        	   16233	      9435 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192         	   24502	      9089 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Execute/false/8192        	   32161	      5296 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192         	   47839	      3916 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Execute/false/8192        	   34208	      5285 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192         	   47930	      3936 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Execute/false/8192        	   33324	      5944 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192         	   46677	      4056 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Execute/false/8192        	   18640	     11467 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192         	   31389	      5158 ns/op	       0 B/op	       0 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64
+cpu: AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     
+BenchmarkDirectMap32Execute/false/8192        	   34056	      5299 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDirectMap32Execute/true/8192         	   47378	      3971 ns/op	       0 B/op	       0 allocs/op
+PASS

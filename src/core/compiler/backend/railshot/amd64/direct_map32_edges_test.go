@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
@@ -225,13 +226,19 @@ func TestDirectMap32RealNative(t *testing.T) {
 		global := i + m.ImportedFuncCount()
 		if global == 5011 || global == 6688 || global == 11168 {
 			t.Logf("candidate function=%d native=%d frame=%d spills=%d reloads=%d stats=%v", global, x.CodeBytes, x.FrameBytes, x.Spills, x.Reloads, x.Peephole)
+			if dir := os.Getenv("DIRECT_MAP32_ARTIFACTS"); dir != "" {
+				start := cm.Entry[i]
+				if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("yosys-%d.bin", global)), cm.Code[start:start+x.CodeBytes], 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
 		}
 		if x.Peephole["region-loop-map32"] != 0 {
 			selected += x.Peephole["region-loop-map32"]
 			t.Logf("function=%d selections=%d native=%d frame=%d spills=%d reloads=%d", i+m.ImportedFuncCount(), x.Peephole["region-loop-map32"], x.CodeBytes, x.FrameBytes, x.Spills, x.Reloads)
 		}
 	}
-	t.Logf("module=%s bytes=%d selections=%d", path, len(cm.Code), selected)
+	t.Logf("module=%s bytes=%d selections=%d required-features=%v", path, len(cm.Code), selected, cm.RequiredAMD64Features)
 }
 
 func directMap32YosysModule(t testing.TB) *wasm.Module {

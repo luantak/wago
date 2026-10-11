@@ -51,7 +51,7 @@ manifest = {"baseline": subprocess.check_output(["git", "rev-parse", "HEAD"], cw
             "experiment": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
             "cpu": cpu, "features_backend": "SSSE3|SSE4.1|SSE4.2|AVX",
             "features_public": "unchanged detected host features on both versions",
-            "features_existing_sum": "unchanged detected host features on both versions",
+            "features_existing_sum": "unchanged backend default AMD64ModernBaseline|BMI2 on both versions",
             "backend_regex": a.backend_regex,
             "samples": a.samples, "environment": {k: env[k] for k in ["GOMAXPROCS", "GOFLAGS"]},
             "sources": {}}

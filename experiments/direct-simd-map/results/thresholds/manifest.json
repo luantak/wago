@@ -1,0 +1,23 @@
+{
+  "baseline": "b00d96f8f0ac75092481d84ffb7cabf01332abc8",
+  "experiment": "2660962a7956b38255c7bb08f902fb58f682d282",
+  "cpu": 6,
+  "features_backend": "SSSE3|SSE4.1|SSE4.2|AVX",
+  "features_public": "unchanged detected host features on both versions",
+  "samples": 3,
+  "environment": {
+    "GOMAXPROCS": "1",
+    "GOFLAGS": "-buildvcs=false"
+  },
+  "sources": {
+    "src/core/compiler/backend/railshot/amd64/direct_map32.go": "5818dfe1d85047403a9809bc4b749d9c39f548e697b31360353db44e6c261bf8",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_corpus_test.go": "9a4173a2d1562d0f5ad4ea91c47e7a9710b7f0a773f0d0b95dafe6342530c27a",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_edges_test.go": "30f59fefef7f371dc7424eb03eef5e14661fe39c341da5d7285b721eb980d50d",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_profile_test.go": "e0c2b7e2a567c412b6bb7dd218b04f07f6d94802c274ce424ddcc6cb864b11b5",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_qualification_test.go": "94c8d8526c2f9787e184578b8aa94db1af09a0d842e3f159833412273d327560",
+    "src/core/compiler/backend/railshot/amd64/direct_map32_test.go": "ed3176df37db4b6880d94781c631a21e0f5e5777283fcf79cbefe91045cc5d5e",
+    "src/wago/direct_map32_bench_test.go": "561bdc7a22b2fdf60dbb85270cfa3bae93ec1e9e6047d0a76ce3df5e4d50d2d5"
+  },
+  "features_existing_sum": "unchanged backend default AMD64ModernBaseline|BMI2 on both versions",
+  "public_feature_record": "results/public-feature-record.txt; host and selected mask 0x7ff on this host"
+}

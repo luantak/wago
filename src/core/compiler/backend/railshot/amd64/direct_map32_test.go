@@ -216,6 +216,22 @@ func BenchmarkDirectMap32Execute(b *testing.B) {
 						b.Fatal(err)
 					}
 				}
+				b.StopTimer()
+				want := uint32(n*4) ^ uint32(src+uint64(n)*4) ^ n
+				if n != 0 {
+					last := uint32(10)
+					if fp {
+						last = math.Float32bits(10)
+					}
+					want ^= last
+					mem := jm.CurrentBytes()
+					if binary.LittleEndian.Uint32(mem) != last || binary.LittleEndian.Uint32(mem[uint64(n-1)*4:]) != last {
+						b.Fatal("streaming output mismatch", fp, n)
+					}
+				}
+				if binary.LittleEndian.Uint64(out) != uint64(want) {
+					b.Fatal("streaming local mismatch", fp, n, binary.LittleEndian.Uint64(out), want)
+				}
 			})
 		}
 	}
