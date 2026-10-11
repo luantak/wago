@@ -11,6 +11,9 @@ import (
 )
 
 func TestDirectMap32HeapAllocationBudget(t *testing.T) {
+	if profileEnabled {
+		t.Skip("allocation budget applies to builds without profile instrumentation")
+	}
 	for _, fp := range []bool{false, true} {
 		scalar, candidate := directMap32Fixture(t, fp, true), directMap32Fixture(t, fp, false)
 		opts := CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Workers: 1, DeferCodeMapping: true}
