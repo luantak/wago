@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	map32CodeReserve          = 1024
+	map32CodeReserve          = 512
 	map32FunctionReserveLimit = 4 * map32CodeReserve
 	map32ModuleReserveLimit   = 1 << 20
 )

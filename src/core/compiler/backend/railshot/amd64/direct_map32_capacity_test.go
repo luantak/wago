@@ -16,32 +16,88 @@ func TestDirectMap32HeapAllocationBudget(t *testing.T) {
 		t.Skip("allocation budget applies to builds without profile instrumentation")
 	}
 	for _, fp := range []bool{false, true} {
-		scalar, candidate := directMap32Fixture(t, fp, true), directMap32Fixture(t, fp, false)
-		opts := CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Workers: 1, DeferCodeMapping: true}
-		count := func(useCandidate bool) float64 {
-			m := scalar
-			if useCandidate {
-				m = candidate
+		for _, shape := range []string{"ascending", "countdown", "step2", "step4", "affine", "last-homes"} {
+			if fp && shape == "affine" {
+				continue
 			}
-			return testing.AllocsPerRun(100, func() {
-				cm, err := CompileModuleWith(m, opts)
+			scalar, candidate := directMap32Fixture(t, fp, true), directMap32Fixture(t, fp, false)
+			if shape == "countdown" {
+				scalar, candidate = directMap32Countdown(t, fp, true), directMap32Countdown(t, fp, false)
+			}
+			for _, m := range []*wasm.Module{scalar, candidate} {
+				body := m.Code[0].BodyBytes
+				if shape == "step2" || shape == "step4" {
+					step := byte(2)
+					if shape == "step4" {
+						step = 4
+					}
+					body = bytes.Replace(body, []byte{0x20, 2, 0x41, 1, 0x6a}, []byte{0x20, 2, 0x41, step, 0x6a}, 1)
+				}
+				if shape == "affine" && !fp {
+					body = bytes.Replace(body, []byte{0x20, 4, 0x6c}, []byte{0x20, 4, 0x20, 5, 0x6a, 0x6c}, 1)
+				}
+				if shape == "last-homes" {
+					m.Code[0].Locals.Runs[0].Count = 2
+					store := byte(0x36)
+					if fp {
+						store = 0x38
+					}
+					body = bytes.Replace(body, []byte{0x22, 6, store}, []byte{0x22, 6, 0x22, 7, store}, 1)
+				}
+				m.Code[0].BodyBytes = body
+				if err := wasm.ValidateModule(m); err != nil {
+					t.Fatal(err)
+				}
+			}
+			opts := CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Workers: 1, DeferCodeMapping: true}
+			ft, _ := candidate.LocalFuncType(0)
+			nLocals := len(ft.Params)
+			for _, run := range candidate.Code[0].Locals.Runs {
+				nLocals += int(run.Count)
+			}
+			h, err := scanFuncBody(candidate.Code[0], nLocals, 0, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if directMap32CodeReserve(candidate, 0, h.funcHints, opts, wasm.NewModuleInstructionClassifier(candidate, true)) == 0 {
+				t.Fatal("allocation fixture lacks an admitted map", fp, shape)
+			}
+			if diagnosticsEnabled {
+				var stats ModuleStats
+				preflight := opts
+				preflight.Stats = &stats
+				cm, err := CompileModuleWith(candidate, preflight)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if cm.CodeImage != nil {
 					cm.CodeImage.Close()
 				}
-			})
-		}
-		want, got := count(false), count(true)
-		if got != want {
-			t.Errorf("fp=%t: heap compile allocations = %g, scalar = %g", fp, got, want)
+				if stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+					t.Fatal("allocation fixture did not emit SIMD", fp, shape)
+				}
+			}
+			count := func(m *wasm.Module) float64 {
+				return testing.AllocsPerRun(100, func() {
+					cm, err := CompileModuleWith(m, opts)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if cm.CodeImage != nil {
+						cm.CodeImage.Close()
+					}
+				})
+			}
+			want, got := count(scalar), count(candidate)
+			if got != want {
+				t.Errorf("fp=%t shape=%s: heap compile allocations = %g, scalar = %g", fp, shape, got, want)
+			}
 		}
 	}
 }
 
 func TestDirectMap32CapacityPreservesCode(t *testing.T) {
-	for _, count := range []int{1, 32, 1024, 1025} {
+	for _, count := range []int{1, 32, 2048, 2049} {
 		m := directMap32Fixture(t, false, false)
 		fn := m.Code[0]
 		for len(m.Code) < count {
