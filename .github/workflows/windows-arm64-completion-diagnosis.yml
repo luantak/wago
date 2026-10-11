@@ -53,3 +53,174 @@ jobs:
           Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001; StartTime=(Get-Date).AddHours(-2)} -ErrorAction SilentlyContinue |
             Where-Object { $_.Message -match '(?im)^\s*(Faulting application name|P1):\s*(bash|sh|wago)\.exe(?:,|\s|$)' } |
             Select-Object TimeCreated, Id, Message | Format-List
+
+  full-suite:
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        include:
+          - goos: windows
+            goarch: arm64
+            runtime: true
+    env:
+      GO_VERSION: "1.27.1"
+      CURRENT_GO_VERSION: "1.27.1"
+      TINYGO_VERSION: "0.42.0"
+      JUST_VERSION: "1.58.0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.27.1"
+          cache: true
+          cache-dependency-path: |
+            go.work
+            go.mod
+            go.sum
+            bench/go.mod
+            bench/go.sum
+            cli/wago-installer/go.mod
+      - name: Configure runner-local shell crash capture before any probes
+        shell: pwsh
+        run: |
+          $names = @('bash.exe', 'sh.exe', 'wago.exe')
+          $base = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+          foreach ($name in $names) {
+            if (Test-Path -LiteralPath "$base\$name") {
+              throw "Existing per-application dump configuration for $name"
+            }
+          }
+          $dumpDirectory = Join-Path $env:RUNNER_TEMP 'wago-shell-crashes'
+          New-Item -ItemType Directory -Force -Path $dumpDirectory | Out-Null
+          "WAGO_COMPLETION_DUMP_DIR=$dumpDirectory" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          foreach ($name in $names) {
+            $key = "$base\$name"
+            New-Item -Path $key -Force | Out-Null
+            New-ItemProperty -Path $key -Name DumpFolder -Value $dumpDirectory -PropertyType ExpandString -Force | Out-Null
+            New-ItemProperty -Path $key -Name DumpCount -Value 10 -PropertyType DWord -Force | Out-Null
+            New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
+          }
+          Write-Output 'Per-application mini dumps enabled locally; raw dumps are not uploaded.'
+      - name: Install wabt (Windows)
+        shell: pwsh
+        run: ./tests/scripts/install-wabt-windows.ps1
+      - name: Verify native runner (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if ($(go env GOOS) -ne '${{ matrix.goos }}') { throw 'wrong GOOS' }
+          if ($(go env GOARCH) -ne '${{ matrix.goarch }}') { throw 'wrong GOARCH' }
+          go version
+          Get-ComputerInfo | Select-Object OsName, OsArchitecture
+      - name: Native build publication regressions
+        if: matrix.runtime
+        run: go test -v -count=1 -run '^TestBuild(OutputSnapshotRejectsTargetDisappearance|DarwinFilesOnlyDirectoryExplainsPrivateStageRequirement|NewWindowsOutputPreservesWriteOnlyInheritance)$' ./cli/runtime/commands/build
+      - name: Checked compiler tests on Windows
+        if: matrix.runtime && runner.os == 'Windows'
+        run: go test -count=1 -tags=wago_regalloccheck ./internal/regalloccheck ./src/core/encoder/... ./src/core/compiler/backend/railshot/... ./src/wago
+      - name: Compiler diagnostic tests
+        if: matrix.runtime
+        env:
+          WAGO_SHARED_SCALAR: "0"
+        run: go test -count=1 -tags wago_codegenstats ./src/core/compiler/backend/railshot/... ./src/wago ./cli/runtime/internal/artifactcache
+      - name: Shared scalar diagnostic tests
+        if: matrix.runtime
+        env:
+          WAGO_SHARED_SCALAR: "1"
+        run: go test -count=1 -tags wago_codegenstats -run '^Test(SharedScalar|ScalarIncoming|ScalarRawIncoming|ScalarValueBounds)' ./src/core/compiler/backend/railshot/... ./src/wago
+      - name: Profiling metadata and capture tests
+        if: matrix.runtime
+        run: go test -count=1 -tags wago_profile ./internal/jitprofile ./profile ./internal/profcapture ./internal/profilecmd ./cli/internal/profiling
+      - name: Profiling runtime and source-map tests
+        if: matrix.runtime
+        run: go test -count=1 -tags wago_profile -run '^Test(CodeProfile|Profile|AdapterUnwind)' ./src/wago ./src/core/compiler/backend/railshot/...
+      - name: Build & test (Windows)
+        if: matrix.runtime && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          go build ./...
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go build -tags wago_runtime ./cli/...
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -count=1 ./...
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -count=1 -tags wago_runtime ./cli/...
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -count=20 -run '^TestCompiledSnapshotPacksRepeatedNestedSlices$' ./src/wago
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -count=20 -run '^TestCredentialTemporaryFileIsPrivateAndReadersSeeCompleteJSON$' ./cli/manager/internal/registry
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Push-Location cli/wago-installer
+          try {
+            go test -count=1 ./...
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+          Push-Location bench
+          try {
+            go test -count=1 -skip '^(TestCorpus|TestCorpusSemanticExec|TestApplicationCorpusRuns)$' ./...
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+      - name: Record fault events and locally decode captured exceptions
+        if: always()
+        shell: pwsh
+        run: |
+          Get-WinEvent -FilterHashtable @{LogName='Application'; Id=1000,1001; StartTime=(Get-Date).AddHours(-2)} -ErrorAction SilentlyContinue |
+            Where-Object { $_.Message -match '(?im)^\s*(Faulting application name|P1):\s*(bash|sh|wago)\.exe(?:,|\s|$)' } |
+            Select-Object TimeCreated, Id, Message | Format-List
+          if (-not $env:WAGO_COMPLETION_DUMP_DIR) {
+            throw 'Local dump setup did not complete.'
+          }
+          $dumps = @(Get-ChildItem -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR -Filter '*.dmp' -File)
+          Write-Output "Captured local mini dumps: $($dumps.Count)"
+          if ($dumps.Count -eq 0) {
+            Write-Output 'No local dump was collected; this does not establish a crash mechanism or exclude custom crash handling.'
+            exit 0
+          }
+          $roots = @('C:\Program Files (x86)\Windows Kits\10\Debuggers', 'C:\Program Files\Windows Kits\10\Debuggers')
+          $debuggers = @(Get-ChildItem -Path $roots -Filter cdb.exe -File -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object @{Expression={ if ($_.FullName -match '\\arm64\\') { 0 } else { 1 } }}, FullName)
+          if ($debuggers.Count -eq 0) {
+            throw 'Crash capture succeeded but CDB is unavailable; raw dumps will remain private and be removed.'
+          }
+          foreach ($dump in $dumps) {
+            Write-Output "Exception, stack and module report for $($dump.Name)"
+            $start = [System.Diagnostics.ProcessStartInfo]::new()
+            $start.FileName = $debuggers[0].FullName
+            $start.UseShellExecute = $false
+            $start.RedirectStandardOutput = $true
+            $start.RedirectStandardError = $true
+            $start.ArgumentList.Add('-z')
+            $start.ArgumentList.Add($dump.FullName)
+            $start.ArgumentList.Add('-c')
+            $start.ArgumentList.Add('.exr -1; .ecxr; k; lm; q')
+            $process = [System.Diagnostics.Process]::Start($start)
+            $output = $process.StandardOutput.ReadToEndAsync()
+            $errorOutput = $process.StandardError.ReadToEndAsync()
+            if (-not $process.WaitForExit(120000)) {
+              $process.Kill($true)
+              throw 'CDB exceeded the diagnostic time budget.'
+            }
+            Write-Output $output.GetAwaiter().GetResult()
+            Write-Output $errorOutput.GetAwaiter().GetResult()
+            if ($process.ExitCode -ne 0) { throw "CDB exited $($process.ExitCode)" }
+          }
+      - name: Remove runner-local dump data and per-application configuration
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:WAGO_COMPLETION_DUMP_DIR) {
+            $base = 'HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps'
+            foreach ($name in @('bash.exe', 'sh.exe', 'wago.exe')) {
+              if (Test-Path -LiteralPath "$base\$name") {
+                Remove-Item -LiteralPath "$base\$name" -Recurse -Force
+              }
+            }
+            if (Test-Path -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR) {
+              Remove-Item -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR -Recurse -Force
+            }
+          }
