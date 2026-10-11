@@ -41,7 +41,7 @@ jobs:
           $failed = 0
           for ($observation = 1; $observation -le 50; $observation++) {
             Write-Output "Fresh native Go parent observation $observation"
-            & .tmp/completion-helper/wago.exe -test.v -test.timeout=20s -test.run '^TestBashCompletionPassesNestedCommandWords$'
+            & .tmp/completion-helper/wago.exe '-test.v' '-test.timeout=20s' '-test.run=^TestBashCompletionPassesNestedCommandWords$'
             if ($LASTEXITCODE -ne 0) { $failed++ }
           }
           Write-Output "Failed fresh-process observations: $failed"
