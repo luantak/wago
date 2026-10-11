@@ -7,6 +7,7 @@ import (
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 )
@@ -59,7 +60,7 @@ func TestDirectMap32HeapAllocationBudget(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if directMap32CodeReserve(candidate, 0, h.funcHints, opts, wasm.NewModuleInstructionClassifier(candidate, true)) == 0 {
+			if directMap32CodeReserve(candidate, 0, h.funcHints, &opts) == 0 {
 				t.Fatal("allocation fixture lacks an admitted map", fp, shape)
 			}
 			if diagnosticsEnabled {
@@ -142,9 +143,8 @@ func TestDirectMap32ReserveBounds(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			classifier := wasm.NewModuleInstructionClassifier(m, true)
 			opts := CompileOptions{AMD64Features: shared.AMD64ModernBaseline}
-			reserve := directMap32CodeReserve(m, 0, h.funcHints, opts, classifier)
+			reserve := directMap32CodeReserve(m, 0, h.funcHints, &opts)
 			want := map32CodeReserve
 			if rejected {
 				want = 0
@@ -152,31 +152,31 @@ func TestDirectMap32ReserveBounds(t *testing.T) {
 			if reserve != want {
 				t.Fatalf("fp=%t rejected=%t reserve=%d want=%d", fp, rejected, reserve, want)
 			}
-			if allocs := testing.AllocsPerRun(1000, func() { directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) }); allocs != 0 {
+			if allocs := testing.AllocsPerRun(1000, func() { directMap32CodeReserve(m, 0, h.funcHints, &opts) }); allocs != 0 {
 				t.Fatalf("reserve allocates %g objects", allocs)
 			}
 			opts.AMD64Features = 0
-			if !fp && directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+			if !fp && directMap32CodeReserve(m, 0, h.funcHints, &opts) != 0 {
 				t.Fatal("unsupported i32 CPU reserves space")
 			}
 			opts.AMD64Features = shared.AMD64ModernBaseline
 			opts.Interruptible = true
-			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+			if directMap32CodeReserve(m, 0, h.funcHints, &opts) != 0 {
 				t.Fatal("interruptible function reserves space")
 			}
 			opts.Interruptible = false
 			m.Memories[0].Shared = true
-			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+			if directMap32CodeReserve(m, 0, h.funcHints, &opts) != 0 {
 				t.Fatal("shared memory reserves space")
 			}
 			m.Memories[0].Shared = false
 			m.Memories[0].Limits.Addr64 = true
-			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+			if directMap32CodeReserve(m, 0, h.funcHints, &opts) != 0 {
 				t.Fatal("memory64 reserves space")
 			}
 			m.Memories[0].Limits.Addr64 = false
 			m.Code[0].BodyBytes = append(m.Code[0].BodyBytes, make([]byte, regionLoopMaxBytes)...)
-			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+			if directMap32CodeReserve(m, 0, h.funcHints, &opts) != 0 {
 				t.Fatal("large function exceeds scan bound")
 			}
 		}
@@ -221,7 +221,7 @@ func TestDirectMap32FunctionReserveLimit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got := directMap32CodeReserve(m, 0, h.funcHints, CompileOptions{AMD64Features: shared.AMD64ModernBaseline}, classifier)
+		got := directMap32CodeReserve(m, 0, h.funcHints, &CompileOptions{AMD64Features: shared.AMD64ModernBaseline})
 		want := min(count*map32CodeReserve, map32FunctionReserveLimit)
 		if got != want {
 			t.Errorf("loops=%d reserve=%d want=%d", count, got, want)
@@ -243,9 +243,42 @@ func TestDirectMap32CapacityUsesHintScan(t *testing.T) {
 			body[i] = 1
 		}
 		m.Code[0].BodyBytes = body
-		got := directMap32CodeReserve(m, 0, h[0], CompileOptions{AMD64Features: shared.AMD64ModernBaseline}, wasm.NewModuleInstructionClassifier(m, true))
+		got := directMap32CodeReserve(m, 0, h[0], &CompileOptions{AMD64Features: shared.AMD64ModernBaseline})
 		if got != map32CodeReserve {
 			t.Fatalf("fp=%t: capacity re-scanned body: %d", fp, got)
+		}
+	}
+}
+
+func TestDirectMap32HintPacking(t *testing.T) {
+	if unsafe.Sizeof(funcHints{}) != 28 {
+		t.Fatal("retained hints grew")
+	}
+	for _, fp := range []bool{false, true} {
+		m := directMap32Fixture(t, fp, false)
+		fn := m.Code[0]
+		for len(m.Code) < 512 {
+			m.Code = append(m.Code, fn)
+			m.FuncTypes = append(m.FuncTypes, m.FuncTypes[0])
+		}
+		if !parallelHintScanEligible(m, 0, 4) {
+			t.Fatal("parallel scan fixture too small")
+		}
+		for _, workers := range []int{1, 4} {
+			hints, _, _, err := computeModuleHintsWithWorkersPolicy(m, 0, 0, workers, nil, false, currentCodegenPolicy())
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, h := range hints {
+				if h.map32HintCount() != 1 {
+					t.Fatal("map count lost", fp, workers, h.map32HintCount())
+				}
+				density := h.immediateFreeOpCount()
+				h.noteFixedScratchLease()
+				if !h.hasFixedScratchLease() || h.immediateFreeOpCount() != density || h.map32HintCount() != 1 {
+					t.Fatal("packed hints interfere")
+				}
+			}
 		}
 	}
 }

@@ -96,9 +96,9 @@ type funcHints struct {
 	// inlineCallSites packs a saturated 7-bit ordinary-call count plus a high
 	// bit recording any return_call reference to this local function.
 	inlineCallSites uint8
-	// Saturated sizing hint only; stable arena growth handles underestimates.
+	// Packed sizing hints only; stable arena growth handles underestimates.
 	// Uses the final two padding bytes, without widening the retained header.
-	immediateFreeOps uint16
+	immediateFreeOps uint16 // low 9 bits: density; next 6: bounded map counts; bit 15: lease
 }
 
 const (
@@ -154,16 +154,15 @@ func (h *funcHints) markUnsupportedDynamicCall() {
 // retained per function; all variable-length data lives in one module sidecar.
 type funcHintView struct {
 	funcHints
-	entryInitialized     uint64 // scan-local view; compilation decodes bits during pin planning
-	nLocals              int
-	localScore           []uint32
-	localLastGet         []uint32
-	sparseGlobals        []shared.GlobalHint
-	localEvents          *shared.LocalEventTape // scan-only, never copied into funcHints
-	localEventMeta       uint32                 // reconstructed from the sparse sidecar
-	residencyShadow      shared.ResidencyShadowSummary
-	loopIntConsts        *loopIntConstHintEntry
-	directMapCodeReserve int // transient sizing hint; no retained header or sidecar storage
+	entryInitialized uint64 // scan-local view; compilation decodes bits during pin planning
+	nLocals          int
+	localScore       []uint32
+	localLastGet     []uint32
+	sparseGlobals    []shared.GlobalHint
+	localEvents      *shared.LocalEventTape // scan-only, never copied into funcHints
+	localEventMeta   uint32                 // reconstructed from the sparse sidecar
+	residencyShadow  shared.ResidencyShadowSummary
+	loopIntConsts    *loopIntConstHintEntry
 }
 
 type loopIntConstHintEntry struct {
@@ -246,7 +245,7 @@ func (h funcHints) hasFixedScratchLease() bool {
 }
 
 func (h funcHints) immediateFreeOpCount() uint16 {
-	return h.immediateFreeOps &^ fixedScratchLeaseMask
+	return h.immediateFreeOps & immediateFreeOpMask
 }
 
 func (h *funcHints) noteControlDepth(depth int) {
@@ -861,7 +860,7 @@ func scanBodyBytesWithLoopIntConsts(body []byte, nLocals int, nGlobals int, self
 	} else {
 		cached = wasm.NewModuleInstructionClassifier(m, true)
 	}
-	s := byteBodyScanner{r: byteScanReader{Reader: r}, h: h, nLocals: nLocals, nGlobals: nGlobals, selfIdx: selfIdx, elig: elig, globalHints: globalHints, entryPrefix: true, memory64: memory64, m: m, classifier: cached, gcTypeLayouts: gcTypeLayouts, gcStructHelpers: gcStructHelpers, moduleHints: moduleHints, parallelCalls: parallelCalls, importedFuncs: importedFuncs, collectLoopIntConsts: collect}
+	s := byteBodyScanner{r: byteScanReader{Reader: r}, h: h, nLocals: nLocals, nGlobals: nGlobals, selfIdx: selfIdx, elig: elig, globalHints: globalHints, entryPrefix: true, memory64: memory64, m: m, classifier: cached, gcTypeLayouts: gcTypeLayouts, gcStructHelpers: gcStructHelpers, moduleHints: moduleHints, parallelCalls: parallelCalls, importedFuncs: importedFuncs, collectLoopIntConsts: collect, map32Hints: len(body) <= regionLoopMaxBytes && nLocals <= 256}
 	called, term, err := s.scanExpr(0, 0, -1, false)
 	if err != nil {
 		return s.h, s.selectedLoopIntConsts, s.selectedLoopIntConstN, err
@@ -960,6 +959,8 @@ type byteBodyScanner struct {
 	loopIntConstN         uint8
 	selectedLoopIntConsts [2]int64
 	selectedLoopIntConstN uint8
+	map32Hints            bool
+	map32Shape            uint16
 }
 
 func (s *byteBodyScanner) notePhysicalEvent(op byte, depth int) {
@@ -1037,8 +1038,13 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 		case 0x02, 0x03, 0x04: // block, loop, if
 			s.h.flags.set(hintHasControlFlow)
 			s.entryPrefix = false
+			emptyLoop := false
 			if op == 0x03 {
 				s.h.flags.set(hintHasLoop)
+				bt, ok := s.r.Reader.Peek()
+				emptyLoop = ok && bt == 0x40
+			} else if s.map32Shape != 0 {
+				s.map32Shape |= map32HintInvalid
 			}
 			s.h.noteControlDepth(depth + 1)
 			if err := wasm.SkipInstructionImmediate(&s.r.Reader, op); err != nil {
@@ -1055,6 +1061,11 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 				}
 				subHasCall = subHasCall || calls
 			case 0x03: // loop
+				previousShape := s.map32Shape
+				s.map32Shape = 0
+				if s.map32Hints && emptyLoop && s.h.map32HintCount() < 4 {
+					s.map32Shape = map32HintActive
+				}
 				loop := s.elig.push()
 				calls, term, err := s.scanExpr(depth+1, loopDepth+1, loop, false)
 				if err != nil {
@@ -1071,6 +1082,11 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 					}
 				}
 				s.elig.pop(loop)
+				s.finishMap32Hint()
+				s.map32Shape = previousShape
+				if previousShape != 0 {
+					s.map32Shape |= map32HintInvalid
+				}
 			case 0x04: // if
 				callsThen, term, err := s.scanExpr(depth+1, loopDepth, curLoop, true)
 				if err != nil {
@@ -1202,9 +1218,27 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 		case 0x0c, 0x0d: // br, br_if
 			s.h.flags.set(hintHasControlFlow)
 			s.entryPrefix = false
-			if _, err := s.r.U32(); err != nil {
+			label, err := s.r.U32()
+			if err != nil {
 				return true, 0, err
 			}
+			if s.map32Shape != 0 && label == 0 {
+				s.map32Shape |= map32HintBranch
+			}
+		case 0x01: // nop: scalar oracle and a known planner rejection
+			if s.map32Shape != 0 {
+				s.map32Shape |= map32HintInvalid
+			}
+			s.noteImmediateFreeOp()
+		case 0x6c, 0x94: // scalar multiply, also used by the capacity estimate
+			if s.map32Shape != 0 {
+				if op == 0x6c {
+					s.map32Shape |= map32HintMulI32
+				} else {
+					s.map32Shape |= map32HintMulF32
+				}
+			}
+			s.noteImmediateFreeOp()
 		case 0x00, 0x0f: // unreachable, return
 			s.h.flags.set(hintHasControlFlow)
 			s.entryPrefix = false
@@ -1229,6 +1263,7 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 			if err != nil {
 				return true, 0, err
 			}
+			s.noteMap32Memory(op, imm)
 			if op == 0xfd {
 				s.h.flags.set(hintHasSIMD)
 			}
@@ -1285,9 +1320,7 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 			s.h.flags.set(hintModuleEH)
 		default:
 			if _, ok := wasm.ImmediateFreeInstructionKind(op); ok {
-				if count := s.h.immediateFreeOpCount(); count < defaultStackArenaCap {
-					s.h.immediateFreeOps = s.h.immediateFreeOps&fixedScratchLeaseMask | count + 1
-				}
+				s.noteImmediateFreeOp()
 				break
 			}
 			var imm wasm.InstructionImmediate
@@ -1406,5 +1439,11 @@ func instrTouchesMemory(k wasm.InstrKind) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (s *byteBodyScanner) noteImmediateFreeOp() {
+	if count := s.h.immediateFreeOpCount(); count < defaultStackArenaCap {
+		s.h.immediateFreeOps = s.h.immediateFreeOps&^immediateFreeOpMask | count + 1
 	}
 }

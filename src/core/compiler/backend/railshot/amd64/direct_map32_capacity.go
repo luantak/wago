@@ -3,7 +3,6 @@
 package amd64
 
 import (
-	"bytes"
 	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 )
@@ -12,71 +11,83 @@ const (
 	map32CodeReserve          = 512
 	map32FunctionReserveLimit = 4 * map32CodeReserve
 	map32ModuleReserveLimit   = 1 << 20
+	immediateFreeOpMask       = uint16(1<<9 - 1) // the existing count saturates at 256
+	map32I32HintShift         = 9
+	map32F32HintShift         = 12
+	map32HintMask             = uint16(7<<map32I32HintShift | 7<<map32F32HintShift)
 )
 
-// Reserve guard/body space for small map functions. This is a sizing hint, not
-// an emission decision: later register/home checks can still reject a plan.
-// Larger functions retain the existing growth path. Both scans and storage are
-// bounded; ordinary functions skip the scan through their existing hints.
-func directMap32CodeReserve(m *wasm.Module, index int, h funcHints, opts CompileOptions, classifier wasm.ModuleInstructionClassifier) int {
-	body := m.Code[index].BodyBytes
-	if !h.flags.has(hintHasLoop) || h.flags.has(hintModuleEH) || len(body) == 0 || len(body) > regionLoopMaxBytes || h.localCount > 256 || opts.Interruptible || len(opts.CustomInstructions) != 0 || opts.GCFrameRoots.Function(index) != nil {
-		return 0
-	}
-	// Every admitted map has an explicit i32.mul or f32.mul. A byte check
-	// rejects common ordinary loops cheaply; false positives still need proof.
-	if bytes.IndexByte(body, 0x6c) < 0 && bytes.IndexByte(body, 0x94) < 0 {
+func (h funcHints) map32HintCount() int {
+	return int(h.immediateFreeOps>>map32I32HintShift&7) + int(h.immediateFreeOps>>map32F32HintShift&7)
+}
+
+// The hint scan records a conservative shape, not a legality proof. Emission
+// still runs the full planner and guards. No body read or temporary type array.
+func directMap32CodeReserve(m *wasm.Module, index int, h funcHints, opts *CompileOptions) int {
+	if h.map32HintCount() == 0 || len(m.Code[index].BodyBytes) > regionLoopMaxBytes || h.localCount > 256 || h.flags.has(hintModuleEH) || opts.Interruptible || len(opts.CustomInstructions) != 0 || opts.GCFrameRoots.Function(index) != nil {
 		return 0
 	}
 	mem, ok := m.MemoryType(0)
 	if !ok || mem.Shared || mem.Limits.Addr64 {
 		return 0
 	}
-	ft, ok := m.LocalFuncType(index)
-	if !ok {
-		return 0
+	n := int(h.immediateFreeOps >> map32F32HintShift & 7)
+	if opts.AMD64Features.Has(shared.AMD64SSE41) {
+		n += int(h.immediateFreeOps >> map32I32HintShift & 7)
 	}
-	var types [256]machineType
-	n := 0
-	for _, typ := range ft.Params {
-		if n == len(types) {
-			return 0
-		}
-		types[n] = mtOf(typ)
-		n++
+	return n * map32CodeReserve
+}
+
+const (
+	map32HintActive uint16 = 1 << iota
+	map32HintInvalid
+	map32HintLoadI32
+	map32HintLoadF32
+	map32HintStoreI32
+	map32HintStoreF32
+	map32HintMulI32
+	map32HintMulF32
+	map32HintBranch
+)
+
+func (s *byteBodyScanner) noteMap32Memory(op byte, imm wasm.InstructionImmediate) {
+	if s.map32Shape == 0 {
+		return
 	}
-	for _, run := range m.Code[index].Locals.Runs {
-		if uint64(run.Count) > uint64(len(types)-n) {
-			return 0
-		}
-		for j := uint32(0); j < run.Count; j++ {
-			types[n] = mtOf(run.Type)
-			n++
-		}
+	var bit uint16
+	switch op {
+	case 0x28:
+		bit = map32HintLoadI32
+	case 0x2a:
+		bit = map32HintLoadF32
+	case 0x36:
+		bit = map32HintStoreI32
+	case 0x38:
+		bit = map32HintStoreF32
+	default:
+		s.map32Shape |= map32HintInvalid
+		return
 	}
-	reserve := 0
-	r := wasm.ReaderFrom(body)
-	for r.BytesLeft() > 0 && reserve < map32FunctionReserveLimit {
-		op, err := r.Byte()
-		if err != nil {
-			return reserve
-		}
-		look := r
-		var imm wasm.InstructionImmediate
-		if classifier.ClassifyInto(&r, op, &imm) != nil {
-			return reserve
-		}
-		if op != 3 {
-			continue
-		}
-		bt, err := look.Byte()
-		if err != nil || bt != 0x40 {
-			continue
-		}
-		var p regionLoopPlan
-		if inspectRegionLoop(r, types[:n], classifier, &p) && p.map32 && p.qualifyMap32() && (p.nodes[p.loads[0].node].op != 0x28 || opts.AMD64Features.Has(shared.AMD64SSE41)) {
-			reserve += map32CodeReserve
-		}
+	if s.map32Shape&bit != 0 || imm.MemIndex != 0 || imm.MemOffset > uint64(^uint32(0)) {
+		s.map32Shape |= map32HintInvalid
 	}
-	return reserve
+	s.map32Shape |= bit
+}
+
+func (s *byteBodyScanner) finishMap32Hint() {
+	shape := s.map32Shape
+	if shape&(map32HintActive|map32HintInvalid|map32HintBranch) != map32HintActive|map32HintBranch || s.h.map32HintCount() == 4 {
+		return
+	}
+	const memoryMask = map32HintLoadI32 | map32HintLoadF32 | map32HintStoreI32 | map32HintStoreF32
+	shift := 0
+	if shape&memoryMask == map32HintLoadI32|map32HintStoreI32 && shape&map32HintMulI32 != 0 {
+		shift = map32I32HintShift
+	}
+	if shape&memoryMask == map32HintLoadF32|map32HintStoreF32 && shape&map32HintMulF32 != 0 {
+		shift = map32F32HintShift
+	}
+	if shift != 0 {
+		s.h.immediateFreeOps += 1 << shift
+	}
 }

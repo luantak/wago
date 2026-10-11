@@ -1915,26 +1915,17 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 	// whole accumulated code — on a 16 MB module that churns hundreds of MB of
 	// garbage. Under-estimating only costs a tail append; it is never incorrect.
 	totalBody := 0
+	mapReserve := 0
 	for i := range m.Code {
 		totalBody += len(m.Code[i].BodyBytes)
+		if allHints[i].map32HintCount() != 0 && mapReserve < map32ModuleReserveLimit && !inlineTargets.omitStandaloneBody(i, hostAdapters[i]) {
+			reserve := directMap32CodeReserve(m, i, allHints[i], &opts)
+			mapReserve += min(reserve, map32ModuleReserveLimit-mapReserve)
+		}
 	}
 	codeCap := moduleCodeCapacityAMD64(totalBody, n, policy)
 	moduleTypes := buildModuleTypeCache(m, totalBody)
 	classifier := wasm.NewModuleInstructionClassifier(m, true)
-	mapReserve := 0
-	for i, h := range allHints {
-		if inlineTargets.omitStandaloneBody(i, hostAdapters[i]) {
-			continue
-		}
-		reserve := directMap32CodeReserve(m, i, h, opts, classifier)
-		if reserve > map32ModuleReserveLimit-mapReserve {
-			reserve = map32ModuleReserveLimit - mapReserve
-		}
-		mapReserve += reserve
-		if mapReserve == map32ModuleReserveLimit {
-			break
-		}
-	}
 	if maxReserve := int(^uint(0)>>1) - codeCap; mapReserve > maxReserve {
 		mapReserve = maxReserve
 	}
@@ -2276,7 +2267,10 @@ func compileModuleParallel(m *wasm.Module, opts CompileOptions, workers, codeCap
 				}
 			}
 			hints := hintSidecar.viewAt(allHints[i], i)
-			hints.directMapCodeReserve = directMap32CodeReserve(m, i, allHints[i], opts, classifier)
+			if allHints[i].map32HintCount() != 0 {
+				ws.scratch.asm.B = ws.scratch.asm.B[:0]
+				ws.scratch.asm.Grow(asmCapForBody(len(m.Code[i].BodyBytes)) + directMap32CodeReserve(m, i, allHints[i], &opts))
+			}
 			fnCode, rl, internalOff, err := compileFunc(m, opts.Codegen.Module.GCTypeLayouts, i, hostAdapters[i], guardMode, boundsFacts, opts.Interruptible, moduleHasSIMD, modGlobals, &hints, immutableTables, opts.ImportBindings, opts.SyncHostCalls, opts.SyncHostSlots, opts.GCTypeSubtypingRefTest, opts.GCStructHelpers, opts.GCArrayHelpers, opts.CustomInstructions, opts.GCFrameRoots.Function(i), st, inlineTargets, ws.scratch)
 			if err != nil {
 				work.failures.Record(i, err)
@@ -3514,7 +3508,7 @@ func compileFuncAttempt(m *wasm.Module, gcTypeLayouts []codegen.GCTypeLayout, fu
 	} else {
 		sc.asm.EncodingStats = nil
 	}
-	sc.asm.Grow(asmCapForBody(len(c.BodyBytes)) + hints.directMapCodeReserve)
+	sc.asm.Grow(asmCapForBody(len(c.BodyBytes)))
 	if compactNativePolicy(sc.policy) {
 		if hints.flags.has(hintHasLoop) && !loopCompactionEnabled || hints.flags.has(hintHasJumpTableData) && !jumpTableCompactionEnabled || len(custom) != 0 {
 			// These are finalizer exclusions known before emission. Avoid

@@ -339,3 +339,19 @@ func TestDirectMap32Countdown(t *testing.T) {
 		}
 	}
 }
+
+// Isolate the shared hint scan from native emission in the ALU control.
+func BenchmarkDirectMap32ALUHints(b *testing.B) {
+	m := benchALUHeavyModule(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h, _, _, err := computeModuleHints(m, 0, 0, nil, false)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(h) != 1 || h[0].flags.has(hintHasLoop) {
+			b.Fatal("invalid ALU hint fixture")
+		}
+	}
+}
