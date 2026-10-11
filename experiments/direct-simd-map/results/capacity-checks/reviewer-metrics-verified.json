@@ -1,0 +1,1946 @@
+{
+  "capacity-before": {
+    "main": {
+      "BenchmarkDirectMap32YosysExecute/8192": {
+        "samples": [
+          {
+            "ns_op": 1936.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1881.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1941.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1947.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1896.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1865.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          }
+        ],
+        "median_ns_op": 1916.0,
+        "median_bytes_op": 0.0,
+        "median_allocs_op": 0.0
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": [
+          {
+            "ns_op": 17631.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 16426.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17966.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 16814.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 16985.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17411.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 17198.0,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": [
+          {
+            "ns_op": 17496.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 16623.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18360.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17350.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17477.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 16858.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 17413.5,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": [
+          {
+            "ns_op": 29630.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 28408.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 30218.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 29013.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 29506.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 31627.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          }
+        ],
+        "median_ns_op": 29568.0,
+        "median_bytes_op": 9456.0,
+        "median_allocs_op": 11.0
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": [
+          {
+            "ns_op": 12394.0,
+            "bytes_op": 14152,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 9681.0,
+            "bytes_op": 14152,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 10054.0,
+            "bytes_op": 14152,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 10182.0,
+            "bytes_op": 14152,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 9833.0,
+            "bytes_op": 14152,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 9938.0,
+            "bytes_op": 14152,
+            "allocs_op": 32
+          }
+        ],
+        "median_ns_op": 9996.0,
+        "median_bytes_op": 14152.0,
+        "median_allocs_op": 32.0
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": [
+          {
+            "ns_op": 13094.0,
+            "bytes_op": 14184,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 11253.0,
+            "bytes_op": 14184,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 10168.0,
+            "bytes_op": 14184,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 9908.0,
+            "bytes_op": 14184,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 9346.0,
+            "bytes_op": 14184,
+            "allocs_op": 32
+          },
+          {
+            "ns_op": 9931.0,
+            "bytes_op": 14184,
+            "allocs_op": 32
+          }
+        ],
+        "median_ns_op": 10049.5,
+        "median_bytes_op": 14184.0,
+        "median_allocs_op": 32.0
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": [
+          {
+            "ns_op": 10521.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7490.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7912.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 8070.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7343.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7899.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 7905.5,
+        "median_bytes_op": 12520.0,
+        "median_allocs_op": 30.0
+      }
+    },
+    "candidate": {
+      "BenchmarkDirectMap32YosysExecute/8192": {
+        "samples": [
+          {
+            "ns_op": 4918.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1894.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 2144.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1935.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1903.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1948.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          }
+        ],
+        "median_ns_op": 1941.5,
+        "median_bytes_op": 0.0,
+        "median_allocs_op": 0.0
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": [
+          {
+            "ns_op": 26928.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18728.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18788.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18620.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18777.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 20014.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 18782.5,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": [
+          {
+            "ns_op": 26317.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18399.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 19728.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18894.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 19505.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 19392.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 19448.5,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": [
+          {
+            "ns_op": 35860.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 31282.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 30891.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 30321.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 31294.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 34009.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          }
+        ],
+        "median_ns_op": 31288.0,
+        "median_bytes_op": 9456.0,
+        "median_allocs_op": 11.0
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": [
+          {
+            "ns_op": 11515.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 12306.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 11636.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 12481.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 11889.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10640.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 11762.5,
+        "median_bytes_op": 13096.0,
+        "median_allocs_op": 30.0
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": [
+          {
+            "ns_op": 10419.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 12283.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10982.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 11756.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10851.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10532.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 10916.5,
+        "median_bytes_op": 13096.0,
+        "median_allocs_op": 30.0
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": [
+          {
+            "ns_op": 8240.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 9476.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 8027.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7878.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 8112.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7983.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 8069.5,
+        "median_bytes_op": 12520.0,
+        "median_allocs_op": 30.0
+      }
+    },
+    "main-whole": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": [
+          {
+            "ns_op": 67258.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 62764.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 65400.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 63818.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 58496.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 61676.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          }
+        ],
+        "median_ns_op": 63291.0,
+        "median_bytes_op": 24129.0,
+        "median_allocs_op": 106.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": [
+          {
+            "ns_op": 65095.0,
+            "bytes_op": 24131,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 65854.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 66290.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 66598.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 60008.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 62847.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          }
+        ],
+        "median_ns_op": 65474.5,
+        "median_bytes_op": 24129.0,
+        "median_allocs_op": 106.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": [
+          {
+            "ns_op": 73607.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 66143.0,
+            "bytes_op": 24131,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 64125.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 78355.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 59915.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 62383.0,
+            "bytes_op": 24129,
+            "allocs_op": 106
+          }
+        ],
+        "median_ns_op": 65134.0,
+        "median_bytes_op": 24129.0,
+        "median_allocs_op": 106.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": [
+          {
+            "ns_op": 90817.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 65824.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 66534.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 69258.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 60646.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 60605.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          }
+        ],
+        "median_ns_op": 66179.0,
+        "median_bytes_op": 24161.0,
+        "median_allocs_op": 106.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": [
+          {
+            "ns_op": 102587.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 62623.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 63568.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 67144.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 60009.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 59301.0,
+            "bytes_op": 24162,
+            "allocs_op": 106
+          }
+        ],
+        "median_ns_op": 63095.5,
+        "median_bytes_op": 24161.0,
+        "median_allocs_op": 106.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": [
+          {
+            "ns_op": 76441.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 64208.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 64493.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 66447.0,
+            "bytes_op": 24162,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 59834.0,
+            "bytes_op": 24162,
+            "allocs_op": 106
+          },
+          {
+            "ns_op": 59210.0,
+            "bytes_op": 24161,
+            "allocs_op": 106
+          }
+        ],
+        "median_ns_op": 64350.5,
+        "median_bytes_op": 24161.0,
+        "median_allocs_op": 106.0
+      }
+    },
+    "candidate-whole": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": [
+          {
+            "ns_op": 61951.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 63138.0,
+            "bytes_op": 23075,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 68106.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59369.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58727.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59776.0,
+            "bytes_op": 23075,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 60863.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": [
+          {
+            "ns_op": 63279.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 67521.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 69252.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60056.0,
+            "bytes_op": 23074,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58199.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60560.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 61919.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": [
+          {
+            "ns_op": 67523.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 66216.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 65915.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60454.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 61066.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59634.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 63490.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": [
+          {
+            "ns_op": 62679.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 64076.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 65922.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 61158.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59032.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60772.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 61918.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": [
+          {
+            "ns_op": 63847.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 65370.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 64740.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59707.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 61949.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58820.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 62898.0,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": [
+          {
+            "ns_op": 66145.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 68266.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 65954.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 68068.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 62469.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59602.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 66049.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      }
+    }
+  },
+  "capacity-latest-main": {
+    "main": {
+      "BenchmarkDirectMap32YosysExecute/8192": {
+        "samples": [
+          {
+            "ns_op": 11284.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 11170.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 11346.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 11168.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 11333.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 11670.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          }
+        ],
+        "median_ns_op": 11308.5,
+        "median_bytes_op": 0.0,
+        "median_allocs_op": 0.0
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": [
+          {
+            "ns_op": 15457.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14802.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14127.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14087.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14071.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14431.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 14279.0,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": [
+          {
+            "ns_op": 14625.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14316.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14431.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14862.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14770.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 14367.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 14528.0,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": [
+          {
+            "ns_op": 28793.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 28025.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 27408.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 27592.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 27962.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 28527.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          }
+        ],
+        "median_ns_op": 27993.5,
+        "median_bytes_op": 9456.0,
+        "median_allocs_op": 11.0
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": [
+          {
+            "ns_op": 7783.0,
+            "bytes_op": 12488,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7561.0,
+            "bytes_op": 12488,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7777.0,
+            "bytes_op": 12488,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7515.0,
+            "bytes_op": 12488,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7780.0,
+            "bytes_op": 12488,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7903.0,
+            "bytes_op": 12488,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 7778.5,
+        "median_bytes_op": 12488.0,
+        "median_allocs_op": 30.0
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": [
+          {
+            "ns_op": 7516.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7124.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7624.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7197.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7431.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 9335.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 7473.5,
+        "median_bytes_op": 12520.0,
+        "median_allocs_op": 30.0
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": [
+          {
+            "ns_op": 7631.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 9739.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7437.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7350.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7592.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7749.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 7611.5,
+        "median_bytes_op": 12520.0,
+        "median_allocs_op": 30.0
+      }
+    },
+    "candidate": {
+      "BenchmarkDirectMap32YosysExecute/8192": {
+        "samples": [
+          {
+            "ns_op": 1855.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1932.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1828.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1979.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1835.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          },
+          {
+            "ns_op": 1842.0,
+            "bytes_op": 0,
+            "allocs_op": 0
+          }
+        ],
+        "median_ns_op": 1848.5,
+        "median_bytes_op": 0.0,
+        "median_allocs_op": 0.0
+      },
+      "BenchmarkDirectMap32Compile/false": {
+        "samples": [
+          {
+            "ns_op": 17533.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17658.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 18008.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17278.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17293.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17262.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 17413.0,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/true": {
+        "samples": [
+          {
+            "ns_op": 18251.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17518.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17544.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17338.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17522.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          },
+          {
+            "ns_op": 17403.0,
+            "bytes_op": 12072,
+            "allocs_op": 29
+          }
+        ],
+        "median_ns_op": 17520.0,
+        "median_bytes_op": 12072.0,
+        "median_allocs_op": 29.0
+      },
+      "BenchmarkDirectMap32Compile/alu": {
+        "samples": [
+          {
+            "ns_op": 29056.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 29690.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 29056.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 28692.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 28571.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          },
+          {
+            "ns_op": 29616.0,
+            "bytes_op": 9456,
+            "allocs_op": 11
+          }
+        ],
+        "median_ns_op": 29056.0,
+        "median_bytes_op": 9456.0,
+        "median_allocs_op": 11.0
+      },
+      "BenchmarkDirectMap32CompileHeap/i32": {
+        "samples": [
+          {
+            "ns_op": 10503.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10905.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10682.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10619.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10273.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10661.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 10640.0,
+        "median_bytes_op": 13096.0,
+        "median_allocs_op": 30.0
+      },
+      "BenchmarkDirectMap32CompileHeap/f32": {
+        "samples": [
+          {
+            "ns_op": 10304.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10300.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10240.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 12256.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 9963.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 10513.0,
+            "bytes_op": 13096,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 10302.0,
+        "median_bytes_op": 13096.0,
+        "median_allocs_op": 30.0
+      },
+      "BenchmarkDirectMap32CompileHeap/rejected": {
+        "samples": [
+          {
+            "ns_op": 7906.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7973.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7559.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 8265.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 7752.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          },
+          {
+            "ns_op": 8156.0,
+            "bytes_op": 12520,
+            "allocs_op": 30
+          }
+        ],
+        "median_ns_op": 7939.5,
+        "median_bytes_op": 12520.0,
+        "median_allocs_op": 30.0
+      }
+    },
+    "main-whole": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": [
+          {
+            "ns_op": 59837.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 49910.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 49084.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 44529.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 45182.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 97706.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 49497.0,
+        "median_bytes_op": 22465.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": [
+          {
+            "ns_op": 57605.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 49371.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 48980.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 48274.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 47732.0,
+            "bytes_op": 22466,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 93418.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 49175.5,
+        "median_bytes_op": 22465.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": [
+          {
+            "ns_op": 64060.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 52074.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 53640.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 52833.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 53556.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 113925.0,
+            "bytes_op": 22465,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 53598.0,
+        "median_bytes_op": 22465.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": [
+          {
+            "ns_op": 58231.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 47585.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 49627.0,
+            "bytes_op": 22498,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 48181.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 47682.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 112412.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 48904.0,
+        "median_bytes_op": 22497.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": [
+          {
+            "ns_op": 62086.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 48797.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 47104.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 47386.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 48205.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 105103.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 48501.0,
+        "median_bytes_op": 22497.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": [
+          {
+            "ns_op": 66526.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 51869.0,
+            "bytes_op": 22498,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 52546.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 51754.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 51976.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 111202.0,
+            "bytes_op": 22497,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 52261.0,
+        "median_bytes_op": 22497.0,
+        "median_allocs_op": 104.0
+      }
+    },
+    "candidate-whole": {
+      "BenchmarkDirectMap32WholeProgram/false/0": {
+        "samples": [
+          {
+            "ns_op": 55892.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 57565.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 55212.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58615.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58682.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 63404.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 58090.0,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/16": {
+        "samples": [
+          {
+            "ns_op": 57323.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59512.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 53993.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60696.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 63482.0,
+            "bytes_op": 23074,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58151.0,
+            "bytes_op": 23074,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 58831.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/false/8192": {
+        "samples": [
+          {
+            "ns_op": 60069.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 61019.0,
+            "bytes_op": 23075,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59362.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59380.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 61244.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59129.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 59724.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/0": {
+        "samples": [
+          {
+            "ns_op": 58041.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58942.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 56699.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59637.0,
+            "bytes_op": 23074,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60148.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59703.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 59289.5,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/16": {
+        "samples": [
+          {
+            "ns_op": 56383.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 58574.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 56593.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59941.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59345.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59024.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 58799.0,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      },
+      "BenchmarkDirectMap32WholeProgram/true/8192": {
+        "samples": [
+          {
+            "ns_op": 58097.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 60578.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 57911.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59904.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 59848.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          },
+          {
+            "ns_op": 62006.0,
+            "bytes_op": 23073,
+            "allocs_op": 104
+          }
+        ],
+        "median_ns_op": 59876.0,
+        "median_bytes_op": 23073.0,
+        "median_allocs_op": 104.0
+      }
+    }
+  }
+}

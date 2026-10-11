@@ -1,0 +1,13 @@
+Total: 1.44MB
+ROUTINE ======================== github.com/wago-org/wago/src/core/runtime.NewHeapCodeBuffer in /home/jtenner/.codex/worktrees/direct-simd-map/wago/src/core/runtime/code_buffer.go
+  105.73kB   105.73kB (flat, cum)  7.19% of Total
+         .          .     26:func NewHeapCodeBuffer(capacity int) (*CodeBuffer, error) {
+         .          .     27:	if capacity < 0 {
+         .          .     28:		return nil, fmt.Errorf("jit: negative code capacity %d", capacity)
+         .          .     29:	}
+  105.73kB   105.73kB     30:	return &CodeBuffer{mem: make([]byte, capacity), heap: true}, nil
+         .          .     31:}
+         .          .     32:
+         .          .     33:// NewCodeBuffer allocates an RW code image with at least capacity bytes.
+         .          .     34:func NewCodeBuffer(capacity int) (*CodeBuffer, error) {
+         .          .     35:	if capacity < 0 {

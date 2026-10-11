@@ -1,0 +1,21 @@
+{
+  "commit": "66d6c445b",
+  "args": [
+    "claude",
+    "--bare",
+    "-p",
+    "Perform an independent read-only review of correctness, performance, benchmarks, and complex changes. Review the capacity-only change from9b0e87570 to66d6c445b. Files:src/core/compiler/backend/railshot/amd64/direct_map32_capacity.go, compile.go, hints.go, direct_map32_capacity_test.go, direct_map32_resources_test.go, direct_map32.go, vector_map_loop_plan.go, vector_map_loop_emit.go; experiments/direct-simd-map/run.py and results/capacity-tight-main and results/capacity-before when complete. Require specific findings with file locations, evidence, risks, and suggested tests. Prioritize measurable gains, low allocations, and minimal regression risk. Do not edit files or run shell commands. Make your own recommendation from the evidence.",
+    "--model",
+    "opus",
+    "--effort",
+    "high",
+    "--tools",
+    "Read,Glob,Grep",
+    "--disallowedTools",
+    "mcp__*",
+    "--permission-mode",
+    "dontAsk",
+    "--output-format",
+    "text"
+  ]
+}

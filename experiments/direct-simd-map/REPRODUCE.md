@@ -5,12 +5,24 @@ Use the experiment repository root. Requirements: Linux AMD64, Go 1.27.1, Python
 Create a disposable main worktree. The script copies only experiment test harnesses into it; production code remains at the baseline commit.
 
 ```bash
-git worktree add --detach /tmp/wago-direct-map-main b00d96f8f0ac75092481d84ffb7cabf01332abc8
+git worktree add --detach /tmp/wago-direct-map-main cea8f83f101fbdd0fcad634e9c7faad0377b676e
 python3 experiments/direct-simd-map/run.py final \
-  --baseline /tmp/wago-direct-map-main --label reproduce-full --samples 6
+  --baseline /tmp/wago-direct-map-main --label reproduce-capacity-main --samples 6
 ```
 
-The current harness closes every compile code image and includes heap staging. It also checks direct execution results after timing. Public tests use the same original exported Wasm fixtures from `results/native-candidate`. The script refuses to reuse a nonempty result directory. Select a new label for each run. Verify six rows for each benchmark case before using benchstat. Manifests identify both Git commits, source hashes, feature masks, build settings, and CPU affinity. Binary hashes are saved after completion. Source commits in older manifests may predate uncommitted test refinements; the recorded source hashes identify those runs.
+To isolate the capacity change from SIMD emission, repeat against the previous experiment:
+
+```bash
+git worktree add --detach /tmp/wago-direct-map-before-capacity 9b0e87570
+git checkout --detach 66d6c445b39e9f7f6f6042b7c9d5262399587d5a
+python3 experiments/direct-simd-map/run.py final \
+  --baseline /tmp/wago-direct-map-before-capacity --label reproduce-capacity-before --samples 6
+git checkout codex/direct-simd-map
+```
+
+Use merge commit `f62d4ca2d1a1aae62563b03b0c9ed3b522e1c05b` for the latest-main comparison. It contains the final capacity source from `66d6c445b39e9f7f6f6042b7c9d5262399587d5a` plus the same upstream host-call change as latest main. For the isolated capacity comparison against `9b0e87570`, use `66d6c445b` so both versions use the same host code. A documentation-only successor with matching source hashes is also valid. `capacity-latest-main` and `capacity-before` are the authoritative final comparisons. Earlier capacity variants remain as diagnostic evidence.
+
+The current harness closes every compile code image and includes heap staging. It also checks direct execution results after timing. Public tests use the same original exported Wasm fixtures from `results/native-candidate`. The script refuses to reuse a nonempty result directory. Select a new label for each run. Verify six rows for each benchmark case before using benchstat. Manifests identify both Git commits, source hashes (including capacity, compile, and hint code), Wasm input hashes, harness hash, feature masks, build settings, selected environment, Go version, and CPU affinity. Binary hashes are saved after completion. Source commits in older manifests may predate uncommitted test refinements; the recorded source hashes identify those runs.
 
 To repeat only the final closed-image cases, use separate regexes for their different benchmark name depths:
 
@@ -89,9 +101,36 @@ go tool pprof -traces -alloc_objects -focus='imm32|growPreserving' \
 
 Profiling changes execution cost. Do not compare its times with ordinary benchmark times.
 
+For an untimed staging-capacity check, run this command in each version with the same copied test harness:
+
+```bash
+go test -tags=wago_codegenstats -count=1 -v \
+  ./src/core/compiler/backend/railshot/amd64 -run '^TestDirectMap32CapacityResources$'
+```
+
+The saved resource test reports actual compiler staging capacity, native bytes, projected mapped bytes, and retained hint storage. `resources-final.txt` is the final 512-byte reserve; `resources-candidate.txt` is an earlier 1,024-byte reserve.
+
+For the added scan's CPU profile, use the same candidate binary from the benchmark build:
+
+```bash
+GOMAXPROCS=1 taskset -c 6 experiments/direct-simd-map/candidate.test \
+  -test.run '^$' -test.bench '^BenchmarkDirectMap32Compile$/i32$' \
+  -test.benchtime=3s -test.cpuprofile=/tmp/direct-map32-cpu.pprof
+go tool pprof -top -cum -focus='directMap32CodeReserve|inspectRegionLoop' \
+  experiments/direct-simd-map/candidate.test /tmp/direct-map32-cpu.pprof
+```
+
 Saved evidence groups:
 
-- `verified-closed`: authoritative closed-image controls, heap staging, repeated direct calls, original Yosys routine, and public one-call cost; six samples each.
+- `capacity-latest-main`: final 512-byte reserve plus the upstream host-call change versus latest main; six samples for 63 backend cases and six public cases.
+- `capacity-tight-main`: the same capacity source versus the main commit at the start of this follow-up (`b00d96f8f`); six samples per case.
+- `capacity-before`: the same final source versus the previous experiment; six samples for each case.
+- `capacity-checks`: final tests, full diagnostic failure-name comparison, resource measurements, profiles, independent review records, and Claude authentication failures. Profile times are not ordinary benchmark results.
+- `native-capacity`: final native artifacts and original public Wasm fixtures; hashes match the previous native artifacts.
+- `capacity-main`: initial 1,024-byte reserve with two serial sizing scans; diagnostic only.
+- `capacity-final-main`: 1,024-byte reserve after removal of the repeated serial sizing scan and addition of the multiply-byte filter; diagnostic only.
+
+- `verified-closed`: previous experiment closed-image controls, heap staging, repeated direct calls, original Yosys routine, and public one-call cost; six samples each.
 - `final`: full input-size execution sweep and first public pass; compile controls have the documented mapping-retention limit.
 - `final-closed`: a second direct 8,192-element/public pass. Its three-part regex omitted compile and Yosys rows; it is not compile evidence.
 - `verified`: an aborted heap harness run. It called `Close` through a nil image interface. The harness was fixed; this is not a compiler failure or timing comparison.
@@ -103,4 +142,5 @@ The full backend/root failures and missing staged conformance inputs are retaine
 
 ```bash
 git worktree remove --force /tmp/wago-direct-map-main
+git worktree remove --force /tmp/wago-direct-map-before-capacity
 ```

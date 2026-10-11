@@ -1,0 +1,6 @@
+{
+  "main.test": "07a5e7cbbebc1437914b0f300d909130072c919d9a92cbf2381c33e9d1898f49",
+  "candidate.test": "be2617b4a33cb4e356e5aaeec2fda6c4844f767c05ceddca445d2457f8dd329c",
+  "main-api.test": "46f39a2adec6930d991904755ca21237ae3d78c72ed19a529772bbfb3b178097",
+  "candidate-api.test": "a707cc6bd74e3ea1842ffea943dd28fb8805b59f7141031f1eb1456ec7cfdd32"
+}

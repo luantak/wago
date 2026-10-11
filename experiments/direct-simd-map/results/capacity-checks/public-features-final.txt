@@ -1,0 +1,5 @@
+=== RUN   TestDirectMap32PublicFeatureRecord
+    direct_map32_bench_test.go:18: host-features=0x7ff selected-features=0x7ff
+--- PASS: TestDirectMap32PublicFeatureRecord (0.00s)
+PASS
+ok  	github.com/wago-org/wago/src/wago	0.008s

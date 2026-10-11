@@ -1,0 +1,5 @@
+File: candidate.test
+Build ID: d930bf220d725c8fd1a5f4aecaa0c4caa87446d4
+Type: alloc_objects
+Time: 2026-10-11 10:36:47 EDT
+-----------+-------------------------------------------------------

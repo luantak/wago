@@ -1,0 +1,104 @@
+{
+  "capacity-tight-main": {
+    "sources_match_final": true,
+    "inputs_match": true,
+    "counts": {
+      "main": {
+        "cases": 63,
+        "samples_per_case": 6
+      },
+      "candidate": {
+        "cases": 63,
+        "samples_per_case": 6
+      },
+      "main-whole": {
+        "cases": 6,
+        "samples_per_case": 6
+      },
+      "candidate-whole": {
+        "cases": 6,
+        "samples_per_case": 6
+      }
+    }
+  },
+  "capacity-before": {
+    "sources_match_final": true,
+    "inputs_match": true,
+    "counts": {
+      "main": {
+        "cases": 63,
+        "samples_per_case": 6
+      },
+      "candidate": {
+        "cases": 63,
+        "samples_per_case": 6
+      },
+      "main-whole": {
+        "cases": 6,
+        "samples_per_case": 6
+      },
+      "candidate-whole": {
+        "cases": 6,
+        "samples_per_case": 6
+      }
+    }
+  },
+  "diagnostic_suite": {
+    "top_level_failures": 24,
+    "failed_names_including_subtests": 86,
+    "new_failed_names": []
+  },
+  "backend_merge_unchanged": true,
+  "capacity-latest-main": {
+    "baseline": "cea8f83f101fbdd0fcad634e9c7faad0377b676e",
+    "experiment": "f62d4ca2d1a1aae62563b03b0c9ed3b522e1c05b",
+    "source_input_harness_hashes_match": true,
+    "binary_hashes_match": true,
+    "candidate_backend_binary_matches_capacity_before": true,
+    "counts": {
+      "main": {
+        "cases": 63,
+        "samples_per_case": 6
+      },
+      "candidate": {
+        "cases": 63,
+        "samples_per_case": 6
+      },
+      "main-whole": {
+        "cases": 6,
+        "samples_per_case": 6
+      },
+      "candidate-whole": {
+        "cases": 6,
+        "samples_per_case": 6
+      }
+    },
+    "matched_host_sources": {
+      "src/wago/api.go": "1f39fbe2eef0f1783fe6b5c2ac5d2c760049ee3c70dfba2a5f93bbd9aacf7a3c",
+      "src/wago/host_multi.go": "5ca34cc30d08ab776e76c2889068f461b0ff2f657713c921b00ec1562cdd77c4",
+      "src/wago/instance_admission.go": "6cdecaef584e79e38754f1d414749568ed6833b6e145ac729bba69f030e2587d",
+      "src/wago/prepared_function.go": "8c9989b073d1d8dbe447ca2f3e0182b750e12da61c6ea86e68644f4241340729",
+      "src/wago/zz_private_typed_entry.go": "7da116577683555820604e3b2c9deb0161536add7f11a47145356388565b215b"
+    }
+  },
+  "tests_after_merge": [
+    {
+      "command": "DIRECT_MAP32_INPUTS=$PWD/experiments/direct-simd-map/results/native-candidate go test -count=1 -v ./src/wago -run '^Test(OrdinaryCombinedAdmission|DirectMap32PublicFeatureRecord)'",
+      "exit_code": 0,
+      "output": "latest-public-tests.txt"
+    },
+    {
+      "command": "go test -count=1 ./src/core/compiler/backend/railshot/amd64 -run '^TestDirectMap32'",
+      "exit_code": 0,
+      "output": "latest-focused.txt"
+    },
+    {
+      "command": "GOOS=linux GOARCH=arm64 go test -c -o /tmp/wago-map-capacity-arm64.test ./src/core/compiler/backend/railshot/arm64",
+      "exit_code": 0,
+      "output": "latest-arm64-build.txt",
+      "limit": "cross-compilation only"
+    }
+  ],
+  "profile_limit": "Profile timings are excluded from normal benchmarks. CPU and heap profiles use the same backend candidate binary hash as latest-main.",
+  "full_ci_limit": "Full CI is not green. The diagnostic backend comparison has 24 matching top-level failures / 86 names; an earlier root run lacked staged conformance inputs. The latest-main merge adds no backend changes."
+}

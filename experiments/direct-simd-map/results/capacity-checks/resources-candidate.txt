@@ -1,0 +1,15 @@
+=== RUN   TestDirectMap32CapacityResources
+    direct_map32_resources_test.go:31: i32 heap=false native=758 arena=4096 executable=4096 hints=28+28
+    direct_map32_resources_test.go:31: i32 heap=true native=758 arena=1440 executable=4096 hints=28+28
+    direct_map32_resources_test.go:31: f32 heap=false native=760 arena=4096 executable=4096 hints=28+28
+    direct_map32_resources_test.go:31: f32 heap=true native=760 arena=1445 executable=4096 hints=28+28
+    direct_map32_resources_test.go:31: rejected heap=false native=246 arena=4096 executable=4096 hints=28+28
+    direct_map32_resources_test.go:31: rejected heap=true native=246 arena=421 executable=4096 hints=28+28
+    direct_map32_resources_test.go:31: small heap=false native=125 arena=4096 executable=4096 hints=28+8
+    direct_map32_resources_test.go:31: small heap=true native=125 arena=160 executable=4096 hints=28+8
+    direct_map32_resources_test.go:31: control heap=false native=98 arena=4096 executable=4096 hints=28+8
+    direct_map32_resources_test.go:31: control heap=true native=98 arena=226 executable=4096 hints=28+8
+    direct_map32_resources_test.go:50: 1024-maps heap=true native=729132 arena=1318192 executable=733184 hints=28672+28672
+--- PASS: TestDirectMap32CapacityResources (0.01s)
+PASS
+ok  	github.com/wago-org/wago/src/core/compiler/backend/railshot/amd64	0.012s
