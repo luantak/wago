@@ -58,8 +58,12 @@ func TestDirectMap32AscendingSteps(t *testing.T) {
 					// path and entered the checked tail only after full groups.
 					saved := regionLoopTestFast
 					regionLoopTestFast = !scalar
-					got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, setup, 0, 32768, 7, 7+n*uint64(step), 3, 7)
+					var stats ModuleStats
+					got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: optionalTestStats(&stats)}, setup, 0, 32768, 7, 7+n*uint64(step), 3, 7)
 					regionLoopTestFast = saved
+					if !scalar && diagnosticsEnabled && stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+						t.Fatal("ascending candidate was not selected", fp, step, n, stats.Funcs[0].Peephole)
+					}
 					if err != nil {
 						t.Fatal("ascending fast path", fp, step, n, err)
 					}
@@ -72,6 +76,22 @@ func TestDirectMap32AscendingSteps(t *testing.T) {
 			}
 			if step == 1 {
 				continue
+			}
+			// Planned ranges fit. Only the nondivisible count rejects this
+			// otherwise qualified input; the diagnostic trap occurs before stores.
+			m := directMap32Fixture(t, fp, false)
+			m.Code[0].BodyBytes = bytes.Replace(m.Code[0].BodyBytes, []byte{0x20, 2, 0x41, 1, 0x6a}, []byte{0x20, 2, 0x41, step, 0x6a}, 1)
+			var stats ModuleStats
+			saved := regionLoopTestFast
+			regionLoopTestFast = true
+			_, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: optionalTestStats(&stats)}, nil, 0, 32768, 7, 7+16*uint64(step)+1, 3, 7)
+			regionLoopTestFast = saved
+			trap, ok := err.(*coreruntime.TrapError)
+			if !ok || trap.Code != coreruntime.TrapUnreachable || !bytes.Equal(mem, make([]byte, len(mem))) {
+				t.Fatal("divisibility guard did not reject before stores", fp, step, err)
+			}
+			if diagnosticsEnabled && stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+				t.Fatal("divisibility candidate was not selected")
 			}
 			// A nondivisible distance must retain modular scalar execution.
 			// It reaches an OOB store long before the counter can wrap.
@@ -202,12 +222,16 @@ func TestDirectMap32LiveOperandPrefix(t *testing.T) {
 				}
 				saved := regionLoopTestFast
 				regionLoopTestFast = !scalar
-				got, mem, err := runMemAmd64(t, m, func(mem []byte) {
+				var stats ModuleStats
+				got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: optionalTestStats(&stats)}, func(mem []byte) {
 					for i := 0; i < 65; i++ {
 						binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i))
 					}
 				}, 0, 32768, 0, 65, 3, 7)
 				regionLoopTestFast = saved
+				if !scalar && diagnosticsEnabled && stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+					t.Fatal("live-prefix candidate was not selected", fp, floatPrefix, stats.Funcs[0].Peephole)
+				}
 				if err != nil {
 					t.Fatal(err)
 				}

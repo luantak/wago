@@ -112,7 +112,9 @@ func BenchmarkDirectMap32Compile(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				cm.CodeImage.Close()
+				if cm.CodeImage != nil {
+					cm.CodeImage.Close()
+				}
 			}
 		})
 	}
@@ -232,7 +234,9 @@ func BenchmarkDirectMap32CompileHeap(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				cm.CodeImage.Close()
+				if cm.CodeImage != nil {
+					cm.CodeImage.Close()
+				}
 			}
 		})
 	}
