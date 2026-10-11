@@ -3,6 +3,7 @@
 package amd64
 
 import (
+	"bytes"
 	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 )
@@ -20,6 +21,11 @@ const (
 func directMap32CodeReserve(m *wasm.Module, index int, h funcHints, opts CompileOptions, classifier wasm.ModuleInstructionClassifier) int {
 	body := m.Code[index].BodyBytes
 	if !h.flags.has(hintHasLoop) || h.flags.has(hintModuleEH) || len(body) == 0 || len(body) > regionLoopMaxBytes || h.localCount > 256 || opts.Interruptible || len(opts.CustomInstructions) != 0 || opts.GCFrameRoots.Function(index) != nil {
+		return 0
+	}
+	// Every admitted map has an explicit i32.mul or f32.mul. A byte check
+	// rejects common ordinary loops cheaply; false positives still need proof.
+	if bytes.IndexByte(body, 0x6c) < 0 && bytes.IndexByte(body, 0x94) < 0 {
 		return 0
 	}
 	mem, ok := m.MemoryType(0)
