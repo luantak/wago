@@ -61,6 +61,18 @@ for directory in [root / backend, root / "src/wago"]:
 for name in ["vector_map_loop_plan.go", "vector_map_loop_emit.go", "compile.go", "hints.go"]:
     f = root / backend / name
     manifest["sources"][str(f.relative_to(root))] = hashlib.sha256(f.read_bytes()).hexdigest()
+manifest["baseline_sources"] = {}
+for relative in manifest["sources"]:
+    f = a.baseline / relative
+    if f.exists():
+        manifest["baseline_sources"][relative] = hashlib.sha256(f.read_bytes()).hexdigest()
+manifest["inputs"] = {}
+for relative in ["corpus/workloads/assemblyscript/blake-as-simd.wasm", "corpus/workloads/polybench/jacobi-2d.wasm", "corpus/workloads/applications/yosys/yosys.wasm", "experiments/direct-simd-map/results/native-candidate/map-false.wasm", "experiments/direct-simd-map/results/native-candidate/map-true.wasm"]:
+    manifest["inputs"][relative] = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+manifest["environment"].update({k: v for k, v in env.items() if k.startswith("WAGO_") or k.startswith("DIRECT_MAP32_")})
+manifest["go_version"] = subprocess.check_output(["go", "version"], text=True).strip()
+manifest["go_environment"] = json.loads(subprocess.check_output(["go", "env", "-json", "GOARCH", "GOOS", "GOAMD64", "CGO_ENABLED", "GOTOOLCHAIN"], env=env, text=True))
+manifest["harness_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 base = lab / "main.test"
 build(a.baseline, "backend", base)
