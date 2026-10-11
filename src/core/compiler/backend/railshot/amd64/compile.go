@@ -2019,9 +2019,9 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 			}
 			code := codeBuffer.Bytes()
 			entry[i] = len(code)
-			hints := hintSidecar.viewAt(allHints[i], i)
-			hints.directMapCodeReserve = directMap32CodeReserve(m, i, allHints[i], opts, classifier)
-			tailCap := asmCapForBody(len(m.Code[i].BodyBytes)) + hints.directMapCodeReserve
+			// AppendTail exposes all remaining module capacity, including the map
+			// reserve. The serial encoder needs no second capacity scan.
+			tailCap := asmCapForBody(len(m.Code[i].BodyBytes))
 			if compactNativePolicy(policy) {
 				tailCap += amd64.Rel32ScratchSize(finalizerRel32Limit(policy))
 			}
@@ -2037,6 +2037,7 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 			sc.rel32TailBound = false
 			sc.localRefs.Sites = nil
 			sc.localRefTailBound = false
+			hints := hintSidecar.viewAt(allHints[i], i)
 			fnCode, rl, internalOff, err := compileFunc(m, opts.Codegen.Module.GCTypeLayouts, i, hostAdapters[i], guardMode, boundsFacts, opts.Interruptible, moduleHasSIMD, modGlobals, &hints, immutableTables, opts.ImportBindings, opts.SyncHostCalls, opts.SyncHostSlots, opts.GCTypeSubtypingRefTest, opts.GCStructHelpers, opts.GCArrayHelpers, opts.CustomInstructions, opts.GCFrameRoots.Function(i), st, inlineTargets, sc)
 			if err != nil {
 				return nil, fmt.Errorf("amd64: function %d: %w", i, err)
