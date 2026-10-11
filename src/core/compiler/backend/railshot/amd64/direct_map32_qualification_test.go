@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 	coreruntime "github.com/wago-org/wago/src/core/runtime"
 )
@@ -34,6 +35,61 @@ func TestDirectMap32RecognitionAllocations(t *testing.T) {
 			})
 			if allocs != 0 {
 				t.Fatal("recognition allocated", fp, scalar, allocs)
+			}
+		}
+	}
+}
+
+func TestDirectMap32AscendingSteps(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		for _, step := range []byte{1, 2, 4} {
+			for _, n := range []uint64{16, 17, 65} {
+				var result uint64
+				var memory []byte
+				for _, scalar := range []bool{true, false} {
+					m := directMap32Fixture(t, fp, scalar)
+					m.Code[0].BodyBytes = bytes.Replace(m.Code[0].BodyBytes, []byte{0x20, 2, 0x41, 1, 0x6a}, []byte{0x20, 2, 0x41, step, 0x6a}, 1)
+					setup := func(mem []byte) {
+						for i := 0; i < 65; i++ {
+							binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i)+0x3f800001)
+						}
+					}
+					// A guard-failure trap proves that the candidate took the SIMD
+					// path and entered the checked tail only after full groups.
+					saved := regionLoopTestFast
+					regionLoopTestFast = !scalar
+					got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, setup, 0, 32768, 7, 7+n*uint64(step), 3, 7)
+					regionLoopTestFast = saved
+					if err != nil {
+						t.Fatal("ascending fast path", fp, step, n, err)
+					}
+					if scalar {
+						result, memory = got, mem
+					} else if got != result || !bytes.Equal(mem, memory) {
+						t.Fatal("ascending locals or memory changed", fp, step, n)
+					}
+				}
+			}
+			if step == 1 {
+				continue
+			}
+			// A nondivisible distance must retain modular scalar execution.
+			// It reaches an OOB store long before the counter can wrap.
+			var memory []byte
+			var trapCode coreruntime.TrapCode
+			for _, scalar := range []bool{true, false} {
+				m := directMap32Fixture(t, fp, scalar)
+				m.Code[0].BodyBytes = bytes.Replace(m.Code[0].BodyBytes, []byte{0x20, 2, 0x41, 1, 0x6a}, []byte{0x20, 2, 0x41, step, 0x6a}, 1)
+				_, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, nil, 65504, 0, 7, 7+16*uint64(step)+1, 3, 7)
+				trap, ok := err.(*coreruntime.TrapError)
+				if !ok {
+					t.Fatal("nondivisible distance did not trap", err)
+				}
+				if scalar {
+					memory, trapCode = mem, trap.Code
+				} else if !bytes.Equal(memory, mem) || trapCode != trap.Code {
+					t.Fatal("nondivisible fallback changed effects", fp, step)
+				}
 			}
 		}
 	}
@@ -144,11 +200,14 @@ func TestDirectMap32LiveOperandPrefix(t *testing.T) {
 				if err := wasm.ValidateModule(m); err != nil {
 					t.Fatal(err)
 				}
+				saved := regionLoopTestFast
+				regionLoopTestFast = !scalar
 				got, mem, err := runMemAmd64(t, m, func(mem []byte) {
 					for i := 0; i < 65; i++ {
 						binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i))
 					}
 				}, 0, 32768, 0, 65, 3, 7)
+				regionLoopTestFast = saved
 				if err != nil {
 					t.Fatal(err)
 				}

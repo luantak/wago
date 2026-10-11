@@ -145,7 +145,15 @@ func BenchmarkDirectMap32Compile(b *testing.B) {
 					b.Fatal(err)
 				}
 			}
-			benchmarkCompileModule(b, m)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				cm, err := CompileModuleWith(m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline})
+				if err != nil {
+					b.Fatal(err)
+				}
+				cm.CodeImage.Close()
+			}
 		})
 	}
 }

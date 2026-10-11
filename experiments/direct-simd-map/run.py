@@ -12,10 +12,14 @@ p = argparse.ArgumentParser()
 p.add_argument("mode", choices=["thresholds", "final"])
 p.add_argument("--baseline", required=True, type=Path)
 p.add_argument("--samples", type=int, default=6)
+p.add_argument("--label", help="new results directory name")
+p.add_argument("--backend-regex", default="^Benchmark(DirectMap32|LinearSumNoWrapAMD64|CompileLinearSumAMD64)")
 a = p.parse_args()
 root = Path(__file__).resolve().parents[2]
 lab = root / "experiments/direct-simd-map"
-out = lab / "results" / a.mode
+out = lab / "results" / (a.label or a.mode)
+if out.exists() and any(out.iterdir()):
+    p.error(f"results directory is not empty: {out}; select a new --label")
 out.mkdir(parents=True, exist_ok=True)
 backend = "src/core/compiler/backend/railshot/amd64"
 env = dict(os.environ, GOMAXPROCS="1", GOFLAGS="-buildvcs=false",
@@ -46,6 +50,8 @@ manifest = {"baseline": subprocess.check_output(["git", "rev-parse", "HEAD"], cw
             "experiment": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
             "cpu": cpu, "features_backend": "SSSE3|SSE4.1|SSE4.2|AVX",
             "features_public": "unchanged detected host features on both versions",
+            "features_existing_sum": "unchanged detected host features on both versions",
+            "backend_regex": a.backend_regex,
             "samples": a.samples, "environment": {k: env[k] for k in ["GOMAXPROCS", "GOFLAGS"]},
             "sources": {}}
 for directory in [root / backend, root / "src/wago"]:
@@ -89,7 +95,7 @@ else:
         if i % 2:
             order.reverse()
         for name, binary, api in order:
-            measure(binary, "backend", "^Benchmark(DirectMap32|LinearSumNoWrapAMD64|CompileLinearSumAMD64)", name, 1, "150ms")
+            measure(binary, "backend", a.backend_regex, name, 1, "150ms")
             measure(api, "api", "^BenchmarkDirectMap32WholeProgram$", name + "-whole", 1, "150ms")
     for left, right, label in [("main", "candidate", "backend"), ("main-whole", "candidate-whole", "whole")]:
         with (out / f"benchstat-{label}.txt").open("w") as f:
