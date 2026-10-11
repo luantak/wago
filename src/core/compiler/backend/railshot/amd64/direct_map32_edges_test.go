@@ -222,6 +222,10 @@ func TestDirectMap32RealNative(t *testing.T) {
 	defer cm.CodeImage.Close()
 	selected := 0
 	for i, x := range stats.Funcs {
+		global := i + m.ImportedFuncCount()
+		if global == 5011 || global == 6688 || global == 11168 {
+			t.Logf("candidate function=%d native=%d frame=%d spills=%d reloads=%d stats=%v", global, x.CodeBytes, x.FrameBytes, x.Spills, x.Reloads, x.Peephole)
+		}
 		if x.Peephole["region-loop-map32"] != 0 {
 			selected += x.Peephole["region-loop-map32"]
 			t.Logf("function=%d selections=%d native=%d frame=%d spills=%d reloads=%d", i+m.ImportedFuncCount(), x.Peephole["region-loop-map32"], x.CodeBytes, x.FrameBytes, x.Spills, x.Reloads)
