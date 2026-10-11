@@ -228,3 +228,24 @@ func TestDirectMap32FunctionReserveLimit(t *testing.T) {
 		}
 	}
 }
+
+// Capacity must consume the retained hint, not read the function again.
+func TestDirectMap32CapacityUsesHintScan(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		m := directMap32Fixture(t, fp, false)
+		h, _, _, err := computeModuleHints(m, 0, 0, nil, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Preserve the length and type, but remove every loop opcode after scanning.
+		body := append([]byte(nil), m.Code[0].BodyBytes...)
+		for i := range body {
+			body[i] = 1
+		}
+		m.Code[0].BodyBytes = body
+		got := directMap32CodeReserve(m, 0, h[0], CompileOptions{AMD64Features: shared.AMD64ModernBaseline}, wasm.NewModuleInstructionClassifier(m, true))
+		if got != map32CodeReserve {
+			t.Fatalf("fp=%t: capacity re-scanned body: %d", fp, got)
+		}
+	}
+}
