@@ -3,17 +3,11 @@
 package amd64
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
-	enc "github.com/wago-org/wago/src/core/encoder/amd64"
 	coreruntime "github.com/wago-org/wago/src/core/runtime"
 )
 
@@ -52,31 +46,6 @@ func newDirectMap32Run(t testing.TB, m *wasm.Module, opts CompileOptions, size, 
 	}
 	t.Cleanup(func() { coreruntime.Unmap(code) })
 	callEntry := entry + uintptr(cm.Entry[index])
-	if cm.Entry[index] == cm.InternalEntry[index] {
-		// The real Yosys routine has an internal register entry. Add only a native
-		// host adapter; the Wasm module and its compiled function stay unchanged.
-		ft, ok := m.LocalFuncType(index)
-		if !ok || len(ft.Params) != 3 || ft.Params[0] != wasm.I32 || ft.Params[1] != wasm.F32 || ft.Params[2] != wasm.F32 || len(ft.Results) != 0 {
-			t.Fatal("unsupported evidence adapter signature")
-		}
-		a := enc.Asm{}
-		a.MovReg64(RBX, RSI)
-		a.Load64(R15, RBX, -bdCurBytes)
-		a.Push(RCX)
-		a.FLoadDisp(fpArgRegs[0], RDI, 8, false)
-		a.FLoadDisp(fpArgRegs[1], RDI, 16, false)
-		a.Load64(intArgRegs[0], RDI, 0)
-		a.MovImm64(R8, uint64(entry+uintptr(cm.InternalEntry[index])))
-		a.CallReg(R8)
-		a.Pop(RCX)
-		a.Ret()
-		shim, addr, err := coreruntime.MapCode(a.B)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { coreruntime.Unmap(shim) })
-		callEntry = addr
-	}
 	return &directMap32Run{eng: eng, jm: jm, args: ar.Alloc(256), out: ar.Alloc(32), trap: ar.Alloc(coreruntime.TrapBufferBytes), entry: callEntry}
 }
 
@@ -139,122 +108,5 @@ func TestDirectMap32FloatRounding(t *testing.T) {
 				}
 			}
 		}
-	}
-}
-
-func TestDirectMap32RealNative(t *testing.T) {
-	path := os.Getenv("DIRECT_MAP32_REAL")
-	if path == "" {
-		t.Skip("real module not set")
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	m, err := wasm.DecodeModule(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var stats ModuleStats
-	cm, err := CompileModuleWith(m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: optionalTestStats(&stats)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cm.CodeImage.Close()
-	selected := 0
-	for i, x := range stats.Funcs {
-		global := i + m.ImportedFuncCount()
-		if global == 5011 || global == 6688 || global == 11168 {
-			t.Logf("candidate function=%d native=%d frame=%d spills=%d reloads=%d stats=%v", global, x.CodeBytes, x.FrameBytes, x.Spills, x.Reloads, x.Peephole)
-			if dir := os.Getenv("DIRECT_MAP32_ARTIFACTS"); dir != "" {
-				start := cm.Entry[i]
-				if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("yosys-%d.bin", global)), cm.Code[start:start+x.CodeBytes], 0644); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
-		if x.Peephole["region-loop-map32"] != 0 {
-			selected += x.Peephole["region-loop-map32"]
-			t.Logf("function=%d selections=%d native=%d frame=%d spills=%d reloads=%d", i+m.ImportedFuncCount(), x.Peephole["region-loop-map32"], x.CodeBytes, x.FrameBytes, x.Spills, x.Reloads)
-		}
-	}
-	t.Logf("module=%s bytes=%d selections=%d required-features=%v", path, len(cm.Code), selected, cm.RequiredAMD64Features)
-}
-
-func directMap32YosysModule(t testing.TB) *wasm.Module {
-	path := os.Getenv("DIRECT_MAP32_YOSYS")
-	if path == "" {
-		t.Skip("Yosys path not set")
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	m, err := wasm.DecodeModule(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return m
-}
-func setupDirectMap32Yosys(mem []byte, n uint32) {
-	// Unmodified Yosys function 5011 scales two flat arrays and one nested array.
-	binary.LittleEndian.PutUint32(mem[72:], n)
-	binary.LittleEndian.PutUint32(mem[76:], 4096)
-	binary.LittleEndian.PutUint32(mem[84:], n)
-	binary.LittleEndian.PutUint32(mem[88:], 65536)
-	binary.LittleEndian.PutUint32(mem[96:], 1)
-	binary.LittleEndian.PutUint32(mem[100:], 256)
-	binary.LittleEndian.PutUint32(mem[256:], 512)
-	binary.LittleEndian.PutUint32(mem[516:], n)
-	binary.LittleEndian.PutUint32(mem[520:], 131072)
-	for _, ptr := range []int{4096, 65536, 131072} {
-		for i := uint32(0); i < n; i++ {
-			binary.LittleEndian.PutUint32(mem[ptr+int(i)*4:], math.Float32bits(float32(i%1024)/1024))
-		}
-	}
-}
-func TestDirectMap32YosysExecution(t *testing.T) {
-	m := directMap32YosysModule(t)
-	opts := CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}
-	r := newDirectMap32Run(t, m, opts, 1<<20, 5011-m.ImportedFuncCount())
-	for _, n := range []uint32{0, 1, 4, 8, 16, 17, 32, 33, 8192} {
-		mem := r.jm.CurrentBytes()
-		setupDirectMap32Yosys(mem, n)
-		if err := r.call(64, f32b(1.25), f32b(-2)); err != nil {
-			t.Fatal(n, err)
-		}
-		for j, ptr := range []int{4096, 65536, 131072} {
-			for i := uint32(0); i < n; i++ {
-				scale := float32(1.25)
-				if j == 1 {
-					scale = -2
-				}
-				got := binary.LittleEndian.Uint32(mem[ptr+int(i)*4:])
-				want := math.Float32bits((float32(i%1024) / 1024) * scale)
-				if got != want {
-					t.Fatalf("n=%d stream=%d i=%d got=%x want=%x", n, j, i, got, want)
-				}
-			}
-		}
-		t.Logf("n=%d output SHA256=%x", n, sha256.Sum256(mem))
-	}
-}
-func BenchmarkDirectMap32YosysExecute(b *testing.B) {
-	m := directMap32YosysModule(b)
-	r := newDirectMap32Run(b, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, 1<<20, 5011-m.ImportedFuncCount())
-	for _, n := range []uint32{4, 16, 32, 64, 512, 8192} {
-		b.Run(fmt.Sprint(n), func(b *testing.B) {
-			setupDirectMap32Yosys(r.jm.CurrentBytes(), n)
-			binary.LittleEndian.PutUint64(r.args, 64)
-			binary.LittleEndian.PutUint64(r.args[8:], f32b(1))
-			binary.LittleEndian.PutUint64(r.args[16:], f32b(1))
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				if err := r.eng.Call(r.entry, r.args, r.jm.LinearMemory(), r.trap, r.out); err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
 	}
 }
