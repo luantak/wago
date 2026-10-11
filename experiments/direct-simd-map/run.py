@@ -12,6 +12,7 @@ p = argparse.ArgumentParser()
 p.add_argument("mode", choices=["thresholds", "final"])
 p.add_argument("--baseline", required=True, type=Path)
 p.add_argument("--samples", type=int, default=6)
+p.add_argument("--duration", default="150ms", help="duration per final benchmark case")
 p.add_argument("--label", help="new results directory name")
 p.add_argument("--backend-regex", action="append", help="repeat for different benchmark depths")
 a = p.parse_args()
@@ -53,7 +54,7 @@ manifest = {"baseline": subprocess.check_output(["git", "rev-parse", "HEAD"], cw
             "features_public": "unchanged detected host features on both versions",
             "features_existing_sum": "unchanged backend default AMD64ModernBaseline|BMI2 on both versions",
             "backend_regex": a.backend_regex,
-            "samples": a.samples, "environment": {k: env[k] for k in ["GOMAXPROCS", "GOFLAGS"]},
+            "samples": a.samples, "duration": a.duration, "environment": {k: env[k] for k in ["GOMAXPROCS", "GOFLAGS"]},
             "sources": {}}
 for directory in [root / backend, root / "src/wago"]:
     for f in sorted(directory.glob("*map32*.go")):
@@ -109,8 +110,8 @@ else:
             order.reverse()
         for name, binary, api in order:
             for regex in a.backend_regex:
-                measure(binary, "backend", regex, name, 1, "150ms")
-            measure(api, "api", "^BenchmarkDirectMap32WholeProgram$", name + "-whole", 1, "150ms")
+                measure(binary, "backend", regex, name, 1, a.duration)
+            measure(api, "api", "^BenchmarkDirectMap32WholeProgram$", name + "-whole", 1, a.duration)
     for left, right, label in [("main", "candidate", "backend"), ("main-whole", "candidate-whole", "whole")]:
         with (out / f"benchstat-{label}.txt").open("w") as f:
             subprocess.run(["benchstat", str(out / (left + ".txt")), str(out / (right + ".txt"))], stdout=f, check=True)

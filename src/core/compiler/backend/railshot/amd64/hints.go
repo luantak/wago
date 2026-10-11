@@ -1225,20 +1225,6 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 			if s.map32Shape != 0 && label == 0 {
 				s.map32Shape |= map32HintBranch
 			}
-		case 0x01: // nop: scalar oracle and a known planner rejection
-			if s.map32Shape != 0 {
-				s.map32Shape |= map32HintInvalid
-			}
-			s.noteImmediateFreeOp()
-		case 0x6c, 0x94: // scalar multiply, also used by the capacity estimate
-			if s.map32Shape != 0 {
-				if op == 0x6c {
-					s.map32Shape |= map32HintMulI32
-				} else {
-					s.map32Shape |= map32HintMulF32
-				}
-			}
-			s.noteImmediateFreeOp()
 		case 0x00, 0x0f: // unreachable, return
 			s.h.flags.set(hintHasControlFlow)
 			s.entryPrefix = false
@@ -1320,6 +1306,16 @@ func (s *byteBodyScanner) scanExpr(depth int, loopDepth int, curLoop int, stopAt
 			s.h.flags.set(hintModuleEH)
 		default:
 			if _, ok := wasm.ImmediateFreeInstructionKind(op); ok {
+				if s.map32Shape != 0 {
+					switch op {
+					case 0x01:
+						s.map32Shape |= map32HintInvalid
+					case 0x6c:
+						s.map32Shape |= map32HintMulI32
+					case 0x94:
+						s.map32Shape |= map32HintMulF32
+					}
+				}
 				s.noteImmediateFreeOp()
 				break
 			}
