@@ -102,6 +102,25 @@ jobs:
             New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
           }
           Write-Output 'Per-application mini dumps enabled locally; raw dumps are not uploaded.'
+      - name: Install pinned Microsoft ProcDump for first-chance capture
+        shell: pwsh
+        run: |
+          $toolDirectory = Join-Path $env:RUNNER_TEMP 'wago-procdump'
+          New-Item -ItemType Directory -Force -Path $toolDirectory | Out-Null
+          $archive = Join-Path $toolDirectory 'Procdump.zip'
+          Invoke-WebRequest 'https://download.sysinternals.com/files/Procdump.zip' -OutFile $archive
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash -ne '68E057587B0FD654EFA095F76D80D633C0E5C60EA26FD3E7C0011C076BB2D00C') {
+            throw 'ProcDump archive hash differs from inspected release.'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $toolDirectory
+          $captureTool = Join-Path $toolDirectory 'procdump64a.exe'
+          $signature = Get-AuthenticodeSignature -FilePath $captureTool
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+            throw 'ProcDump signature is not valid Microsoft Authenticode.'
+          }
+          Write-Output "ProcDump version: $((Get-Item $captureTool).VersionInfo.FileVersion)"
+          & $captureTool '-accepteula' '-?'
+          "WAGO_PROCDUMP=$captureTool" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Install wabt (Windows)
         shell: pwsh
         run: ./tests/scripts/install-wabt-windows.ps1
@@ -139,31 +158,65 @@ jobs:
         if: matrix.runtime && runner.os == 'Windows'
         shell: pwsh
         run: |
-          go build ./...
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go build -tags wago_runtime ./cli/...
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test -count=1 ./...
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test -count=1 -tags wago_runtime ./cli/...
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test -count=20 -run '^TestCompiledSnapshotPacksRepeatedNestedSlices$' ./src/wago
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test -count=20 -run '^TestCredentialTemporaryFileIsPrivateAndReadersSeeCompleteJSON$' ./cli/manager/internal/registry
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Push-Location cli/wago-installer
+          $readyFile = Join-Path $env:RUNNER_TEMP 'wago-capture-ready'
+          $stopFile = Join-Path $env:RUNNER_TEMP 'wago-capture-stop'
+          $detachedFile = Join-Path $env:RUNNER_TEMP 'wago-capture-detached'
+          $watcherStart = [System.Diagnostics.ProcessStartInfo]::new()
+          $watcherStart.FileName = (Get-Command pwsh).Source
+          $watcherStart.UseShellExecute = $false
+          $watcherStart.RedirectStandardOutput = $true
+          $watcherStart.RedirectStandardError = $true
+          foreach ($argument in @('-NoLogo', '-NoProfile', '-File', (Join-Path $env:GITHUB_WORKSPACE '.github/scripts/watch-completion-faults.ps1'), '-ProcDumpPath', $env:WAGO_PROCDUMP, '-DumpDirectory', $env:WAGO_COMPLETION_DUMP_DIR, '-ReadyFile', $readyFile, '-StopFile', $stopFile, '-DetachedFile', $detachedFile)) {
+            $watcherStart.ArgumentList.Add($argument)
+          }
+          $watcher = [System.Diagnostics.Process]::Start($watcherStart)
+          $watcherOutput = $watcher.StandardOutput.ReadToEndAsync()
+          $watcherErrors = $watcher.StandardError.ReadToEndAsync()
           try {
+            $readyDeadline = [DateTime]::UtcNow.AddSeconds(20)
+            while (-not (Test-Path -LiteralPath $readyFile)) {
+              if ($watcher.HasExited -or [DateTime]::UtcNow -ge $readyDeadline) {
+                throw 'First-chance watcher did not become ready.'
+              }
+              Start-Sleep -Milliseconds 100
+            }
+            go build ./...
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            go build -tags wago_runtime ./cli/...
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             go test -count=1 ./...
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          } finally {
-            Pop-Location
-          }
-          Push-Location bench
-          try {
-            go test -count=1 -skip '^(TestCorpus|TestCorpusSemanticExec|TestApplicationCorpusRuns)$' ./...
+            go test -count=1 -tags wago_runtime ./cli/...
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            go test -count=20 -run '^TestCompiledSnapshotPacksRepeatedNestedSlices$' ./src/wago
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            go test -count=20 -run '^TestCredentialTemporaryFileIsPrivateAndReadersSeeCompleteJSON$' ./cli/manager/internal/registry
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Push-Location cli/wago-installer
+            try {
+              go test -count=1 ./...
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            } finally {
+              Pop-Location
+            }
+            Push-Location bench
+            try {
+              go test -count=1 -skip '^(TestCorpus|TestCorpusSemanticExec|TestApplicationCorpusRuns)$' ./...
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            } finally {
+              Pop-Location
+            }
           } finally {
-            Pop-Location
+            Set-Content -LiteralPath $stopFile -Value 'stop'
+            if (-not $watcher.WaitForExit(45000)) {
+              throw 'Watcher did not finish scoped cancellation within its budget.'
+            }
+            if (Test-Path -LiteralPath $detachedFile) {
+              'WAGO_CAPTURE_STOPPED=1' | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            }
+            Write-Output ($watcherOutput.GetAwaiter().GetResult())
+            Write-Output ($watcherErrors.GetAwaiter().GetResult())
+            if ($watcher.ExitCode -ne 0) { throw "First-chance watcher exited $($watcher.ExitCode)" }
           }
       - name: Record fault events and locally decode captured exceptions
         if: always()
@@ -174,6 +227,9 @@ jobs:
             Select-Object TimeCreated, Id, Message | Format-List
           if (-not $env:WAGO_COMPLETION_DUMP_DIR) {
             throw 'Local dump setup did not complete.'
+          }
+          if ($env:WAGO_CAPTURE_STOPPED -ne '1') {
+            throw 'Capture monitors have not confirmed detachment; dump decoding is blocked.'
           }
           $dumps = @(Get-ChildItem -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR -Filter '*.dmp' -File)
           Write-Output "Captured local mini dumps: $($dumps.Count)"
@@ -220,7 +276,9 @@ jobs:
                 Remove-Item -LiteralPath "$base\$name" -Recurse -Force
               }
             }
-            if (Test-Path -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR) {
+            if ($env:WAGO_CAPTURE_STOPPED -eq '1' -and (Test-Path -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR)) {
               Remove-Item -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR -Recurse -Force
+            } elseif (Test-Path -LiteralPath $env:WAGO_COMPLETION_DUMP_DIR) {
+              Write-Output 'Capture detachment is unconfirmed; raw data stays private on this ephemeral runner until disposal.'
             }
           }
