@@ -1921,6 +1921,24 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 	codeCap := moduleCodeCapacityAMD64(totalBody, n, policy)
 	moduleTypes := buildModuleTypeCache(m, totalBody)
 	classifier := wasm.NewModuleInstructionClassifier(m, true)
+	mapReserve := 0
+	for i, h := range allHints {
+		if inlineTargets.omitStandaloneBody(i, hostAdapters[i]) {
+			continue
+		}
+		reserve := directMap32CodeReserve(m, i, h, opts, classifier)
+		if reserve > map32ModuleReserveLimit-mapReserve {
+			reserve = map32ModuleReserveLimit - mapReserve
+		}
+		mapReserve += reserve
+		if mapReserve == map32ModuleReserveLimit {
+			break
+		}
+	}
+	if maxReserve := int(^uint(0)>>1) - codeCap; mapReserve > maxReserve {
+		mapReserve = maxReserve
+	}
+	codeCap += mapReserve
 	// A one-worker join pays for a second arena and copy. It wins for large bodies,
 	// while serial heap staging is cheaper for modules made mostly of small
 	// functions.
@@ -1944,8 +1962,8 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 		var err error
 		if opts.DeferCodeMapping {
 			capacity := codeCap
-			if capacity >= 256<<10 {
-				capacity -= capacity / 4
+			if capacity-mapReserve >= 256<<10 {
+				capacity -= (capacity - mapReserve) / 4
 			}
 			codeBuffer, err = coreruntime.NewHeapCodeBuffer(capacity)
 		} else {
@@ -2001,7 +2019,9 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 			}
 			code := codeBuffer.Bytes()
 			entry[i] = len(code)
-			tailCap := asmCapForBody(len(m.Code[i].BodyBytes))
+			hints := hintSidecar.viewAt(allHints[i], i)
+			hints.directMapCodeReserve = directMap32CodeReserve(m, i, allHints[i], opts, classifier)
+			tailCap := asmCapForBody(len(m.Code[i].BodyBytes)) + hints.directMapCodeReserve
 			if compactNativePolicy(policy) {
 				tailCap += amd64.Rel32ScratchSize(finalizerRel32Limit(policy))
 			}
@@ -2017,7 +2037,6 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*amd64.CompiledModu
 			sc.rel32TailBound = false
 			sc.localRefs.Sites = nil
 			sc.localRefTailBound = false
-			hints := hintSidecar.viewAt(allHints[i], i)
 			fnCode, rl, internalOff, err := compileFunc(m, opts.Codegen.Module.GCTypeLayouts, i, hostAdapters[i], guardMode, boundsFacts, opts.Interruptible, moduleHasSIMD, modGlobals, &hints, immutableTables, opts.ImportBindings, opts.SyncHostCalls, opts.SyncHostSlots, opts.GCTypeSubtypingRefTest, opts.GCStructHelpers, opts.GCArrayHelpers, opts.CustomInstructions, opts.GCFrameRoots.Function(i), st, inlineTargets, sc)
 			if err != nil {
 				return nil, fmt.Errorf("amd64: function %d: %w", i, err)
@@ -2256,6 +2275,7 @@ func compileModuleParallel(m *wasm.Module, opts CompileOptions, workers, codeCap
 				}
 			}
 			hints := hintSidecar.viewAt(allHints[i], i)
+			hints.directMapCodeReserve = directMap32CodeReserve(m, i, allHints[i], opts, classifier)
 			fnCode, rl, internalOff, err := compileFunc(m, opts.Codegen.Module.GCTypeLayouts, i, hostAdapters[i], guardMode, boundsFacts, opts.Interruptible, moduleHasSIMD, modGlobals, &hints, immutableTables, opts.ImportBindings, opts.SyncHostCalls, opts.SyncHostSlots, opts.GCTypeSubtypingRefTest, opts.GCStructHelpers, opts.GCArrayHelpers, opts.CustomInstructions, opts.GCFrameRoots.Function(i), st, inlineTargets, ws.scratch)
 			if err != nil {
 				work.failures.Record(i, err)
@@ -3493,7 +3513,7 @@ func compileFuncAttempt(m *wasm.Module, gcTypeLayouts []codegen.GCTypeLayout, fu
 	} else {
 		sc.asm.EncodingStats = nil
 	}
-	sc.asm.Grow(asmCapForBody(len(c.BodyBytes)))
+	sc.asm.Grow(asmCapForBody(len(c.BodyBytes)) + hints.directMapCodeReserve)
 	if compactNativePolicy(sc.policy) {
 		if hints.flags.has(hintHasLoop) && !loopCompactionEnabled || hints.flags.has(hintHasJumpTableData) && !jumpTableCompactionEnabled || len(custom) != 0 {
 			// These are finalizer exclusions known before emission. Avoid

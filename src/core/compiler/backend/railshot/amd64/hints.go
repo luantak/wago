@@ -154,15 +154,16 @@ func (h *funcHints) markUnsupportedDynamicCall() {
 // retained per function; all variable-length data lives in one module sidecar.
 type funcHintView struct {
 	funcHints
-	entryInitialized uint64 // scan-local view; compilation decodes bits during pin planning
-	nLocals          int
-	localScore       []uint32
-	localLastGet     []uint32
-	sparseGlobals    []shared.GlobalHint
-	localEvents      *shared.LocalEventTape // scan-only, never copied into funcHints
-	localEventMeta   uint32                 // reconstructed from the sparse sidecar
-	residencyShadow  shared.ResidencyShadowSummary
-	loopIntConsts    *loopIntConstHintEntry
+	entryInitialized     uint64 // scan-local view; compilation decodes bits during pin planning
+	nLocals              int
+	localScore           []uint32
+	localLastGet         []uint32
+	sparseGlobals        []shared.GlobalHint
+	localEvents          *shared.LocalEventTape // scan-only, never copied into funcHints
+	localEventMeta       uint32                 // reconstructed from the sparse sidecar
+	residencyShadow      shared.ResidencyShadowSummary
+	loopIntConsts        *loopIntConstHintEntry
+	directMapCodeReserve int // transient sizing hint; no retained header or sidecar storage
 }
 
 type loopIntConstHintEntry struct {

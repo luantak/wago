@@ -4,6 +4,7 @@ package amd64
 
 import (
 	"bytes"
+	"github.com/wago-org/wago/src/core/compiler/wasm"
 	"testing"
 
 	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
@@ -63,6 +64,55 @@ func TestDirectMap32CapacityPreservesCode(t *testing.T) {
 			}
 			if heap.CodeImage != nil {
 				heap.CodeImage.Close()
+			}
+		}
+	}
+}
+
+func TestDirectMap32ReserveBounds(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		for _, rejected := range []bool{false, true} {
+			m := directMap32Fixture(t, fp, rejected)
+			h, err := scanFuncBody(m.Code[0], 7, 0, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			classifier := wasm.NewModuleInstructionClassifier(m, true)
+			opts := CompileOptions{AMD64Features: shared.AMD64ModernBaseline}
+			reserve := directMap32CodeReserve(m, 0, h.funcHints, opts, classifier)
+			want := map32CodeReserve
+			if rejected {
+				want = 0
+			}
+			if reserve != want {
+				t.Fatalf("fp=%t rejected=%t reserve=%d want=%d", fp, rejected, reserve, want)
+			}
+			if allocs := testing.AllocsPerRun(1000, func() { directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) }); allocs != 0 {
+				t.Fatalf("reserve allocates %g objects", allocs)
+			}
+			opts.AMD64Features = 0
+			if !fp && directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+				t.Fatal("unsupported i32 CPU reserves space")
+			}
+			opts.AMD64Features = shared.AMD64ModernBaseline
+			opts.Interruptible = true
+			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+				t.Fatal("interruptible function reserves space")
+			}
+			opts.Interruptible = false
+			m.Memories[0].Shared = true
+			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+				t.Fatal("shared memory reserves space")
+			}
+			m.Memories[0].Shared = false
+			m.Memories[0].Limits.Addr64 = true
+			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+				t.Fatal("memory64 reserves space")
+			}
+			m.Memories[0].Limits.Addr64 = false
+			m.Code[0].BodyBytes = append(m.Code[0].BodyBytes, make([]byte, regionLoopMaxBytes)...)
+			if directMap32CodeReserve(m, 0, h.funcHints, opts, classifier) != 0 {
+				t.Fatal("large function exceeds scan bound")
 			}
 		}
 	}

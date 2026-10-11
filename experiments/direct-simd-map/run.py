@@ -58,7 +58,7 @@ manifest = {"baseline": subprocess.check_output(["git", "rev-parse", "HEAD"], cw
 for directory in [root / backend, root / "src/wago"]:
     for f in sorted(directory.glob("*map32*.go")):
         manifest["sources"][str(f.relative_to(root))] = hashlib.sha256(f.read_bytes()).hexdigest()
-for name in ["vector_map_loop_plan.go", "vector_map_loop_emit.go"]:
+for name in ["vector_map_loop_plan.go", "vector_map_loop_emit.go", "compile.go", "hints.go"]:
     f = root / backend / name
     manifest["sources"][str(f.relative_to(root))] = hashlib.sha256(f.read_bytes()).hexdigest()
 (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
