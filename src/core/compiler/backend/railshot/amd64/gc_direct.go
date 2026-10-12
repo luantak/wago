@@ -20,6 +20,7 @@ type gcSharedStubKind uint8
 const (
 	gcSharedStubNone gcSharedStubKind = iota
 	gcSharedStubResolveObject
+	gcSharedStubResolveSubtypeObject
 	gcSharedStubMax
 )
 
@@ -382,12 +383,18 @@ func buildModuleGCSharedStubs(relocs [][]callReloc) ([]byte, [gcSharedStubMax]in
 	for i := range offsets {
 		offsets[i] = -1
 	}
-	if !used[gcSharedStubResolveObject] {
+	if !used[gcSharedStubResolveObject] && !used[gcSharedStubResolveSubtypeObject] {
 		return nil, offsets
 	}
 	a := &x64.Asm{}
-	offsets[gcSharedStubResolveObject] = a.Len()
-	emitModuleGCResolveObjectStub(a)
+	if used[gcSharedStubResolveObject] {
+		offsets[gcSharedStubResolveObject] = a.Len()
+		emitModuleGCResolveObjectStub(a)
+	}
+	if used[gcSharedStubResolveSubtypeObject] {
+		offsets[gcSharedStubResolveSubtypeObject] = a.Len()
+		emitModuleGCResolveSubtypeObjectStub(a)
+	}
 	return a.B, offsets
 }
 
@@ -401,6 +408,14 @@ func buildModuleGCSharedStubs(relocs [][]callReloc) ([]byte, [gcSharedStubMax]in
 // The compact reference remains in the caller's canonical local/stack root. A
 // returned raw address is valid only until the caller's next invalidating edge.
 func emitModuleGCResolveObjectStub(a *x64.Asm) {
+	emitModuleGCResolveObjectStubKind(a, false)
+}
+
+func emitModuleGCResolveSubtypeObjectStub(a *x64.Asm) {
+	emitModuleGCResolveObjectStubKind(a, true)
+}
+
+func emitModuleGCResolveObjectStubKind(a *x64.Asm, subtype bool) {
 	a.Push(R9)
 	a.Push(R10)
 	a.Push(R11)
@@ -420,8 +435,7 @@ func emitModuleGCResolveObjectStub(a *x64.Asm) {
 	a.LoadIdx(RDX, R10, RDX, 0, 4, false, false)
 	a.Load64(R8, R8, gc.NativeInstanceViewCollectorOffset)
 
-	// Dynamic semantic validation remains exact: handle range/liveness, space,
-	// backing extent, object extent, and canonical runtime type.
+	// Validate handle range/liveness, space, and backing and object extents.
 	a.ShiftImm(5, RAX, 1, false)
 	a.AluRM(cmpRMcode, RAX, R8, gc.NativeViewHandleCountOffset, false)
 	castFailures = append(castFailures, a.JccPlaceholder(condAE))
@@ -453,8 +467,37 @@ func emitModuleGCResolveObjectStub(a *x64.Asm) {
 
 	a.Add64(R11, RAX)
 	a.Load32(RCX, R11, 0)
-	a.Cmp32(RCX, RDX)
-	castFailures = append(castFailures, a.JccPlaceholder(condNE))
+	if subtype {
+		// The declared open type may have a proper subtype at run time.
+		// Canonical DFS intervals prove required.pre <= actual.pre and
+		// actual.post <= required.post without entering the collector.
+		a.Load64(R8, RBX, -int32(abi.GCNativeViewPtrOffset))
+		a.Load64(R8, R8, gc.NativeInstanceViewCollectorOffset)
+		a.MovRegReg32(RAX, RCX)
+		a.AluRM(cmpRMcode, RAX, R8, gc.NativeViewSubtypeIntervalCountOffset, false)
+		castFailures = append(castFailures, a.JccPlaceholder(condAE))
+		a.MovRegReg32(RAX, RDX)
+		a.AluRM(cmpRMcode, RAX, R8, gc.NativeViewSubtypeIntervalCountOffset, false)
+		castFailures = append(castFailures, a.JccPlaceholder(condAE))
+		a.Load64(R10, R8, gc.NativeViewSubtypeIntervalsOffset)
+		a.TestSelf(R10, true)
+		castFailures = append(castFailures, a.JccPlaceholder(condE))
+		a.ImulRI(RCX, 8, true)
+		a.LoadIdx(RAX, R10, RCX, 0, 8, false, true)
+		a.ImulRI(RDX, 8, true)
+		a.LoadIdx(RDX, R10, RDX, 0, 8, false, true)
+		a.MovReg64(RCX, RAX)
+		a.ShiftImm(5, RCX, 32, true)
+		a.MovReg64(R10, RDX)
+		a.ShiftImm(5, R10, 32, true)
+		a.Cmp32(RCX, R10)
+		castFailures = append(castFailures, a.JccPlaceholder(condB))
+		a.Cmp32(RAX, RDX)
+		castFailures = append(castFailures, a.JccPlaceholder(condA))
+	} else {
+		a.Cmp32(RCX, RDX)
+		castFailures = append(castFailures, a.JccPlaceholder(condNE))
+	}
 	a.Load32(RCX, R11, 4)
 	a.Cmp32(RCX, RDI)
 	castFailures = append(castFailures, a.JccPlaceholder(condB))
@@ -522,6 +565,15 @@ func (f *fn) emitDirectGCObject(object *elem, localType, requiredBytes uint32, l
 }
 
 func (f *fn) emitSharedCheckedGCObject(object *elem, localType, requiredBytes uint32) (obj Reg, done func()) {
+	return f.emitSharedGCObject(object, localType, requiredBytes, gcSharedStubResolveObject)
+}
+
+func (f *fn) emitSharedSubtypeGCObject(object *elem, localType, requiredBytes uint32) (obj Reg, done func()) {
+	f.invalidateGCResolvedObject()
+	return f.emitSharedGCObject(object, localType, requiredBytes, gcSharedStubResolveSubtypeObject)
+}
+
+func (f *fn) emitSharedGCObject(object *elem, localType, requiredBytes uint32, stub gcSharedStubKind) (obj Reg, done func()) {
 	ref := f.materialize(object)
 	if ref != RAX {
 		f.a.MovReg64(RAX, ref)
@@ -533,7 +585,7 @@ func (f *fn) emitSharedCheckedGCObject(object *elem, localType, requiredBytes ui
 		f.checkCallClobber()
 	}
 	site := f.a.CallRel32()
-	f.relocs = append(f.relocs, f.newGCStubCallReloc(site, gcSharedStubResolveObject))
+	f.relocs = append(f.relocs, f.newGCStubCallReloc(site, stub))
 	f.stats.call("gcnative-leaf")
 	f.stats.peep("gc-shared-resolve-call")
 
@@ -2347,7 +2399,7 @@ func (f *fn) emitDirectGCStructGet(typeIndex, fieldIndex uint32, helper uint32) 
 			collectorRef = true
 		}
 	}
-	if !ok || !final {
+	if !ok {
 		return false
 	}
 	local, hasLocal := gcLocalProvenance(f.s.back())
@@ -2356,7 +2408,15 @@ func (f *fn) emitDirectGCStructGet(typeIndex, fieldIndex uint32, helper uint32) 
 	f.spillFloor = f.curSpillSlot()
 	object := f.popValue()
 	required := gc.PayloadOffset + off + uint32(scalar.size)
-	obj, done := f.emitDirectGCObject(object, typeIndex, required, local, hasLocal)
+	var obj Reg
+	var done func()
+	if final {
+		obj, done = f.emitDirectGCObject(object, typeIndex, required, local, hasLocal)
+	} else {
+		obj, done = f.emitSharedSubtypeGCObject(object, typeIndex, required)
+		f.gcHandleResolutions++
+		f.stats.addGCHandleResolution()
+	}
 	disp := int32(gc.PayloadOffset + off)
 	if scalar.typ.isFloat() {
 		x := f.allocFReg(0)
