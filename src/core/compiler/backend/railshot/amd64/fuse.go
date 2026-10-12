@@ -185,6 +185,7 @@ func (f *fn) condenseToFlags(node *elem) Cond {
 			invert = !invert
 		}
 	}
+	f.foldArithmeticEqzCompare(node)
 	if !invert {
 		if cc, ok := f.tryMaskedEqzToFlags(node); ok {
 			f.erase(node)
