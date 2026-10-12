@@ -8,6 +8,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
+- Combine the low-byte results of scalar floating equality and parity tests before one full-width zero extension.
+
 - Improve ARM64 execution with guarded scalar and vector loop lowering, bounded
   register reuse, borrowed operands, indexed address reuse, exact integer dot
   and absolute-difference reductions, min-plus updates, independent floating-point
