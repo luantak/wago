@@ -18,6 +18,8 @@ func TestFPWriteDestinations(t *testing.T) {
 		{"legacy-shift-rm", 1 << 3, func(a *Asm) { a.SseMapRRI(0x66, 0, 0x72, 6, 3, 1) }},
 		{"vex-shift-vvvv", 1 << 3, func(a *Asm) { a.VPsllwImm(3, 4, 1) }},
 		{"vex-extract-rm", 1 << 3, func(a *Asm) { a.VexMapRR(0x3a, 1, 0x39, 4, 3) }},
+		{"ymm-extract-rm", 1 << 11, func(a *Asm) { a.YExtractF128(11, 9, 1) }},
+		{"ymm-shift-vvvv", 1 << 11, func(a *Asm) { a.YPslldImm(11, 9, 1) }},
 		{"ymm", 1 << 3, func(a *Asm) { a.YPaddb(3, 4, 5) }},
 		{"evex-ternary", 1 << 3, func(a *Asm) { a.XPternlogd(3, 4, 5, 0x96) }},
 		{"evex-rotate", 1 << 3, func(a *Asm) { a.XPrordImm(3, 4, 1) }},

@@ -2,6 +2,12 @@
 
 package amd64
 
+import (
+	"math/bits"
+
+	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
+)
+
 // These checks use the existing bounded affine plan. Data arithmetic is admitted
 // only as one load, one multiply and one add, with invariant scalar operands.
 func (p *regionLoopPlan) map32Int(id uint8) bool {
@@ -140,9 +146,22 @@ func (e *regionLoopEmitter) map32Affine(id uint8, dst, tmp Reg) {
 	}
 }
 
-// The qualified streams both advance by four bytes. Equal starts are safe;
-// any other overlap must execute the original scalar loop.
+// Qualified integer zero maps still need range proofs, but no store can
+// affect a later result through the source stream.
+func (p *regionLoopPlan) map32ZeroScale() bool {
+	mul := p.nodes[p.stores[0].value]
+	if mul.op == 0x6a {
+		mul = p.nodes[mul.left]
+	}
+	scale := p.nodes[mul.right]
+	return mul.op == 0x6c && scale.op == 0 && scale.uses == 0 && uint32(scale.bits) == 0
+}
+
+// Nonzero maps require equal starts or disjoint four-byte streams.
 func (e *regionLoopEmitter) map32AliasGuards() {
+	if e.p.map32ZeroScale() {
+		return
+	}
 	f := e.f
 	dst, extent, src, end := e.gp[0], e.gp[1], e.gp[2], e.gp[3]
 	f.a.Load64(dst, RSP, e.off(9+int(e.storeStream[0])))
@@ -193,10 +212,18 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 		return
 	}
 	f, p := e.f, e.p
+	wide := e.map32Wide && count == 4
+	width := int32(16)
+	if wide {
+		count, width = 2, 32
+	}
 	recordSources := profileEnabled && f.stats != nil && f.stats.RecordSources
 	regs := [4]Reg{e.fp[3], e.fp[4], e.fp[5], e.fp[0]}
 	if count == 1 {
 		regs[0] = e.fp[0]
+	}
+	if wide {
+		regs[1] = e.fp[0]
 	}
 	add := p.nodes[p.stores[0].value]
 	mul := p.nodes[add.left]
@@ -208,8 +235,17 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 		f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
 		previous = f.enterProfileInstruction()
 	}
-	for i := 0; i < count; i++ {
-		f.mov128LoadDisp(regs[i], e.gp[1], offset+int32(i*16))
+	// Bounds still cover the original load; zero scales need only stores.
+	if e.map32Shift == -2 {
+		regs = [4]Reg{e.fp[0], e.fp[0], e.fp[0], e.fp[0]}
+	} else {
+		for i := 0; i < count; i++ {
+			if wide {
+				f.a.YMovdquLoadDisp(regs[i], e.gp[1], offset+int32(i)*width)
+			} else {
+				f.mov128LoadDisp(regs[i], e.gp[1], offset+int32(i)*width)
+			}
+		}
 	}
 	if recordSources {
 		f.switchProfileOrigin(previous)
@@ -218,7 +254,11 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 	}
 	if p.nodes[p.loads[0].node].op == 0x2a {
 		for i := 0; i < count; i++ {
-			f.a.SseRR(0, 0x59, regs[i], e.fp[1], false)
+			if wide {
+				f.a.YFPackedMul(regs[i], regs[i], e.fp[1], false)
+			} else {
+				f.a.SseRR(0, 0x59, regs[i], e.fp[1], false)
+			}
 		}
 		if recordSources {
 			f.switchProfileOrigin(previous)
@@ -227,21 +267,41 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 		}
 		if add.op == 0x92 {
 			for i := 0; i < count; i++ {
-				f.a.SseRR(0, 0x58, regs[i], e.fp[2], false)
+				if wide {
+					f.a.YFPackedAdd(regs[i], regs[i], e.fp[2], false)
+				} else {
+					f.a.SseRR(0, 0x58, regs[i], e.fp[2], false)
+				}
 			}
 		}
 	} else {
 		for i := 0; i < count; i++ {
-			f.a.SseMapRR(0x66, 0x38, 0x40, regs[i], e.fp[1]) // SSE4.1 PMULLD
+			if e.map32Shift == -1 {
+				if wide {
+					f.a.YPmulld(regs[i], regs[i], e.fp[1])
+				} else {
+					f.a.SseMapRR(0x66, 0x38, 0x40, regs[i], e.fp[1])
+				}
+			} else if e.map32Shift > 0 {
+				if wide {
+					f.a.YPslldImm(regs[i], regs[i], byte(e.map32Shift))
+				} else {
+					opVPslldImm.emit(f, regs[i], regs[i], byte(e.map32Shift))
+				}
+			}
 		}
 		if recordSources {
 			f.switchProfileOrigin(previous)
 			f.wasmPC = f.tracePCBase + add.pos
 			previous = f.enterProfileInstruction()
 		}
-		if add.op == 0x6a {
+		if add.op == 0x6a && e.map32Shift != -2 {
 			for i := 0; i < count; i++ {
-				f.a.SseRR(0x66, 0xfe, regs[i], e.fp[2], false)
+				if wide {
+					f.a.YPaddd(regs[i], regs[i], e.fp[2])
+				} else {
+					f.a.SseRR(0x66, 0xfe, regs[i], e.fp[2], false)
+				}
 			}
 		}
 	}
@@ -251,7 +311,11 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 		previous = f.enterProfileInstruction()
 	}
 	for i := 0; i < count; i++ {
-		f.mov128StoreDisp(e.gp[0], offset+int32(i*16), regs[i])
+		if wide {
+			f.a.YMovdquStoreDisp(e.gp[0], offset+int32(i)*width, regs[i])
+		} else {
+			f.mov128StoreDisp(e.gp[0], offset+int32(i)*width, regs[i])
+		}
 	}
 	if recordSources {
 		f.switchProfileOrigin(previous)
@@ -267,9 +331,46 @@ func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	if add.op == 0x94 || add.op == 0x6c {
 		mul = add
 	}
-	e.broadcastMap32(mul.right, e.fp[1])
+	e.map32Shift = -1
+	scale := p.nodes[mul.right]
+	if mul.op == 0x6c && scale.op == 0 && scale.uses == 0 {
+		v := uint32(scale.bits)
+		if v == 0 {
+			e.map32Shift = -2
+		} else if v&(v-1) == 0 {
+			e.map32Shift = int8(bits.TrailingZeros32(v))
+		}
+	}
+	if e.map32Shift == -1 {
+		e.broadcastMap32(mul.right, e.fp[1])
+	}
 	if add.op == 0x92 || add.op == 0x6a {
 		e.broadcastMap32(add.right, e.fp[2])
+	}
+	if e.fp[3] != e.fp[0] {
+		features := shared.AMD64AVX
+		if mul.op == 0x6c {
+			features |= shared.AMD64AVX2
+		}
+		e.map32Wide = f.cpuHas(features)
+	}
+	if e.map32Wide {
+		if e.map32Shift == -1 {
+			f.a.YInsertF128(e.fp[1], e.fp[1], e.fp[1], 1)
+		}
+		if add.op == 0x92 || add.op == 0x6a {
+			f.a.YInsertF128(e.fp[2], e.fp[2], e.fp[2], 1)
+		}
+	}
+	if e.map32Shift == -2 {
+		if add.op == 0x6a {
+			f.mov128(e.fp[0], e.fp[2])
+		} else {
+			f.a.SseRR(0x66, 0xef, e.fp[0], e.fp[0], false)
+		}
+		if e.map32Wide {
+			f.a.YInsertF128(e.fp[0], e.fp[0], e.fp[0], 1)
+		}
 	}
 	f.a.Load64(e.gp[0], RSP, e.off(9+int(e.storeStream[0])))
 	f.a.Load64(e.gp[1], RSP, e.off(9+int(e.loadStream[p.loads[0].node])))
@@ -293,6 +394,11 @@ func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	f.a.AluRI(aluTable[opAdd].digit, e.gp[1], 64, true)
 	f.a.AluRI(aluTable[opSub].digit, e.gp[2], 1, false)
 	f.a.PatchRel32(f.a.JccPlaceholder(condNE), top)
+	// Preserve the final lane before legacy SSE cleanup and home commits.
+	if e.map32Wide {
+		f.a.YExtractF128(e.fp[0], e.fp[0], 1)
+		f.a.VZeroUpper()
+	}
 	f.a.TestSelf(e.gp[3], false)
 	noCleanup := f.a.JccPlaceholder(condE)
 	cleanup := f.a.Len()
@@ -316,10 +422,18 @@ func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 		if l.step != 0 {
 			f.a.Load32(e.gp[0], RSP, e.off(i))
 			f.a.Load32(e.gp[1], RSP, e.off(8))
-			if l.step != 1 {
-				f.a.ImulRI(e.gp[1], int32(l.step), false)
+			if l.step == 0xffffffff {
+				f.a.Sub32(e.gp[0], e.gp[1])
+			} else {
+				if l.step != 1 {
+					if l.step&(l.step-1) == 0 {
+						f.a.ShiftImm(4, e.gp[1], uint8(bits.TrailingZeros32(l.step)), false)
+					} else {
+						f.a.ImulRI(e.gp[1], int32(l.step), false)
+					}
+				}
+				f.a.Add32(e.gp[0], e.gp[1])
 			}
-			f.a.Add32(e.gp[0], e.gp[1])
 		} else {
 			f.a.MovXmmToGpr(e.gp[0], e.fp[0], false)
 		}

@@ -39,7 +39,7 @@ func TestDirectMap32Selection(t *testing.T) {
 		t.Skip("requires wago_codegenstats")
 	}
 	for _, fp := range []bool{false, true} {
-		for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64ModernBaseline} {
+		for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64AVX, shared.AMD64ModernBaseline, shared.AMD64ModernBaseline | shared.AMD64AVX2} {
 			var stats ModuleStats
 			cm, err := CompileModuleWith(directMap32Fixture(t, fp, false), CompileOptions{AMD64FeaturesSet: true, AMD64Features: features, Stats: &stats})
 			if err != nil {
@@ -57,7 +57,7 @@ func TestDirectMap32Selection(t *testing.T) {
 func TestDirectMap32Semantics(t *testing.T) {
 	for _, fp := range []bool{false, true} {
 		ref, candidate := directMap32Fixture(t, fp, true), directMap32Fixture(t, fp, false)
-		for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64ModernBaseline} {
+		for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64AVX, shared.AMD64ModernBaseline, shared.AMD64ModernBaseline | shared.AMD64AVX2} {
 			for _, n := range []uint64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 20, 24, 28, 31, 32, 33, 36, 40, 44, 48, 52, 56, 60, 63, 64, 65, 127, 128, 129, 513, 8192} {
 				for _, pair := range [][2]uint64{{128, 32768}, {129, 32769}, {128, 128}, {129, 128}, {128, 129}, {132, 128}, {128, 132}, {128, 65520}, {65520, 128}} {
 					setup := func(mem []byte) {
@@ -252,6 +252,25 @@ func TestDirectMap32AffineEntryValuesAMD64(t *testing.T) {
 				} else if got != result || !bytes.Equal(mem, memory) {
 					t.Fatalf("shape=%s n=%d changed result or memory", shape, n)
 				}
+			}
+		}
+	}
+}
+
+func TestDirectMap32WideFeatureRequirements(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64ModernBaseline, shared.AMD64ModernBaseline | shared.AMD64AVX2} {
+			cm, err := CompileModuleWith(directMap32Fixture(t, fp, false), CompileOptions{AMD64FeaturesSet: true, AMD64Features: features})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cm.CodeImage.Close()
+			if shared.AMD64Features(cm.RequiredAMD64Features) & ^features != 0 {
+				t.Fatalf("fp=%v features=%x required=%x", fp, features, cm.RequiredAMD64Features)
+			}
+			wantAVX2 := !fp && features.Has(shared.AMD64AVX2)
+			if cm.RequiresAVX2 != wantAVX2 {
+				t.Fatalf("fp=%v features=%x avx2=%v want=%v", fp, features, cm.RequiresAVX2, wantAVX2)
 			}
 		}
 	}

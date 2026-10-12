@@ -682,6 +682,7 @@ func (a *Asm) vexShiftImmL(op, ext byte, dst, src Reg, imm, l byte) {
 	a.emit(0xC4, byte1, byte2, op, modrm, imm)
 }
 
+func (a *Asm) YPslldImm(dst, src Reg, imm byte) { a.vexShiftDwordImmL(6, dst, src, imm, 1) }
 func (a *Asm) YPsrldImm(dst, src Reg, imm byte) { a.vexShiftDwordImmL(2, dst, src, imm, 1) }
 func (a *Asm) YPsrlqImm(dst, src Reg, imm byte) { a.vexShiftQwordImmL(2, dst, src, imm, 1) }
 func (a *Asm) YPsllqImm(dst, src Reg, imm byte) { a.vexShiftQwordImmL(6, dst, src, imm, 1) }
@@ -960,6 +961,11 @@ func (a *Asm) FAluDisp(op byte, dst, base Reg, disp int32, f64 bool) {
 }
 
 // YInsertF128 is AVX's floating-domain insertion, requiring no AVX2.
+// YExtractF128 copies one 128-bit half of an AVX vector to an XMM register.
+func (a *Asm) YExtractF128(dst, src Reg, lane byte) {
+	a.vex3RRIMapL(vexMap0F3A, 1, 0x19, src, 0, dst, lane, 1)
+}
+
 func (a *Asm) YInsertF128(dst, src256, src128 Reg, lane byte) {
 	a.vex3RRIMapL(vexMap0F3A, 1, 0x18, dst, src256, src128, lane, 1)
 }

@@ -54,6 +54,8 @@ type regionLoopEmitter struct {
 	slot            int
 	mapSaved        [regionLoopMaxLocals]uint8
 	mapSavedN       int
+	map32Wide       bool
+	map32Shift      int8 // -2: zero, -1: multiply, otherwise left shift
 	fails           [64]int
 	failN           int
 	streams         [10]regionMemoryStream

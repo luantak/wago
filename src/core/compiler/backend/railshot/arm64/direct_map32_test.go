@@ -489,3 +489,63 @@ func TestDirectMap32ConstantScaleARM64(t *testing.T) {
 		}
 	}
 }
+
+// Removing zero-scale arithmetic must retain checked traps and scalar fallback.
+func TestDirectMap32ZeroScaleBoundsARM64(t *testing.T) {
+	for _, n := range []uint64{16, 17, 65} {
+		for _, pair := range [][2]uint64{{129, 32769}, {129, 129}, {129, 125}, {125, 129}, {129, 65520}, {65520, 129}} {
+			setup := func(mem []byte) {
+				for i := range mem {
+					mem[i] = byte(i*17 + 3)
+				}
+			}
+			a, am, ae := runMemArm64WithOptions(t, directMap32ConstantScale(t, true, 0), CompileOptions{}, setup, pair[0], pair[1], 0, n, 0, 0x80000001)
+			b, bm, be := runMemArm64WithOptions(t, directMap32ConstantScale(t, false, 0), CompileOptions{}, setup, pair[0], pair[1], 0, n, 0, 0x80000001)
+			if (ae == nil) != (be == nil) || ae == nil && a != b || !bytes.Equal(am, bm) {
+				t.Fatalf("n=%d pair=%v results=%x/%x errors=%v/%v", n, pair, a, b, ae, be)
+			}
+			if ae != nil {
+				x, xok := ae.(*coreruntime.TrapError)
+				y, yok := be.(*coreruntime.TrapError)
+				if !xok || !yok || x.Code != y.Code || len(x.Frames) != len(y.Frames) {
+					t.Fatal(ae, be)
+				}
+				for i := range x.Frames {
+					if x.Frames[i].HasProgramCounter != y.Frames[i].HasProgramCounter || x.Frames[i].HasProgramCounter && x.Frames[i].ProgramCounter != y.Frames[i].ProgramCounter+1 {
+						t.Fatal("source trap position changed", x.Frames, y.Frames)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestDirectMap32ConstantMultiplyOnlyARM64(t *testing.T) {
+	for _, scale := range []uint32{0, 1, 2, 1 << 31} {
+		for _, n := range []uint64{16, 17, 65} {
+			var result uint64
+			var memory []byte
+			for _, scalar := range []bool{true, false} {
+				m := directMap32ConstantScale(t, scalar, scale)
+				m.Code[0].BodyBytes = bytes.Replace(m.Code[0].BodyBytes, []byte{0x20, 5, 0x6a}, nil, 1)
+				if err := wasm.ValidateModule(m); err != nil {
+					t.Fatal(err)
+				}
+				setup := func(mem []byte) {
+					for i := range mem {
+						mem[i] = byte(i*17 + 3)
+					}
+				}
+				got, mem, err := runMemArm64WithOptions(t, m, CompileOptions{}, setup, 129, 32769, 0, n, 0, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scalar {
+					result, memory = got, mem
+				} else if got != result || !bytes.Equal(mem, memory) {
+					t.Fatalf("scale=%x n=%d changed result or memory", scale, n)
+				}
+			}
+		}
+	}
+}

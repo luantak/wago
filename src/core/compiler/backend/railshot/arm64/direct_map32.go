@@ -121,7 +121,7 @@ type regionLoopEmitter struct {
 	slot     int
 	saved    [regionLoopMaxLocals]uint8
 	savedN   int
-	intShift int8 // -1 multiplies; 0 elides; 1..31 shifts.
+	intShift int8 // -2: zero, -1: multiply, 0: identity, 1..31: shift.
 	fails    [16]int
 	failN    int
 }
@@ -255,7 +255,21 @@ func (e *regionLoopEmitter) rangeCheck(address uint8, offset uint64, pointerSlot
 	f.st64(SP, e.off(pointerSlot), start)
 }
 
+// Qualified integer zero maps still need range proofs, but no store can
+// affect a later result through the source stream.
+func (p *regionLoopPlan) map32ZeroScale() bool {
+	mul := p.nodes[p.stores[0].value]
+	if mul.op == 0x6a {
+		mul = p.nodes[mul.left]
+	}
+	scale := p.nodes[mul.right]
+	return mul.op == 0x6c && scale.op == 0 && scale.uses == 0 && uint32(scale.bits) == 0
+}
+
 func (e *regionLoopEmitter) aliasGuard() {
+	if e.p.map32ZeroScale() {
+		return
+	}
 	f := e.f
 	dst, src, extent, count := e.gp[0], e.gp[1], e.gp[2], e.gp[3]
 	f.ld64(dst, SP, e.off(9))
@@ -368,8 +382,13 @@ func (e *regionLoopEmitter) vectors(count int, offset int32) {
 		f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
 		previous = f.enterProfileInstruction()
 	}
-	for i := 0; i < count; i++ {
-		f.a.LdrQ(regs[i], e.gp[1], offset+int32(i*16))
+	// Range guards retain the original load trap; zero maps need only stores.
+	if e.intShift != -2 {
+		for i := 0; i < count; i++ {
+			f.a.LdrQ(regs[i], e.gp[1], offset+int32(i*16))
+		}
+	} else {
+		regs = [4]Reg{e.fp[0], e.fp[0], e.fp[0], e.fp[0]}
 	}
 	if recordSources {
 		f.switchProfileOrigin(previous)
@@ -392,9 +411,9 @@ func (e *regionLoopEmitter) vectors(count int, offset int32) {
 		}
 	} else {
 		for i := 0; i < count; i++ {
-			if e.intShift < 0 {
+			if e.intShift == -1 {
 				f.a.NeonMulS(regs[i], regs[i], e.fp[1])
-			} else if e.intShift != 0 {
+			} else if e.intShift > 0 {
 				f.a.NeonShlS(regs[i], regs[i], uint8(e.intShift))
 			}
 		}
@@ -403,7 +422,7 @@ func (e *regionLoopEmitter) vectors(count int, offset int32) {
 			f.wasmPC = f.tracePCBase + add.pos
 			previous = f.enterProfileInstruction()
 		}
-		if add.op == 0x6a {
+		if add.op == 0x6a && e.intShift != -2 {
 			for i := 0; i < count; i++ {
 				f.a.NeonAddS(regs[i], regs[i], e.fp[2])
 			}
@@ -435,15 +454,24 @@ func (e *regionLoopEmitter) body(checkedTail int) {
 	if mul.op == 0x6c && scale.op == 0 && scale.uses == 0 {
 		v := uint32(scale.bits)
 		// i32 multiplication wraps, including a scale of 0x80000000.
-		if v != 0 && v&(v-1) == 0 {
+		if v == 0 {
+			e.intShift = -2
+		} else if v&(v-1) == 0 {
 			e.intShift = int8(bits.TrailingZeros32(v))
 		}
 	}
-	if e.intShift < 0 {
+	if e.intShift == -1 {
 		e.broadcast(mul.right, e.fp[1])
 	}
 	if add.op == 0x92 || add.op == 0x6a {
 		e.broadcast(add.right, e.fp[2])
+	}
+	if e.intShift == -2 {
+		if add.op == 0x6a {
+			f.a.NeonMov16b(e.fp[0], e.fp[2])
+		} else {
+			f.a.NeonEor16b(e.fp[0], e.fp[0], e.fp[0])
+		}
 	}
 	f.ld64(e.gp[0], SP, e.off(9))
 	f.ld64(e.gp[1], SP, e.off(10))
@@ -494,11 +522,19 @@ func (e *regionLoopEmitter) body(checkedTail int) {
 		if l.step != 0 {
 			f.ld32(e.gp[0], SP, e.off(i))
 			f.ld32(e.gp[1], SP, e.off(8))
-			if l.step != 1 {
-				f.a.MovImm32(e.gp[2], int32(l.step))
-				f.a.Mul32(e.gp[1], e.gp[1], e.gp[2])
+			if l.step == 0xffffffff {
+				f.a.Sub32(e.gp[0], e.gp[0], e.gp[1])
+			} else {
+				if l.step != 1 {
+					if l.step&(l.step-1) == 0 {
+						f.a.LslImm(e.gp[1], e.gp[1], uint8(bits.TrailingZeros32(l.step)), true)
+					} else {
+						f.a.MovImm32(e.gp[2], int32(l.step))
+						f.a.Mul32(e.gp[1], e.gp[1], e.gp[2])
+					}
+				}
+				f.a.Add32(e.gp[0], e.gp[0], e.gp[1])
 			}
-			f.a.Add32(e.gp[0], e.gp[0], e.gp[1])
 			e.commitLocal(i, e.gp[0])
 		} else {
 			e.commitLocal(i, e.gp[3])

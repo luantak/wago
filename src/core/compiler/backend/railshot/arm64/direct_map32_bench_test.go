@@ -15,7 +15,7 @@ import (
 func BenchmarkDirectMap32ARM64(b *testing.B) {
 	for _, fp := range []bool{false, true} {
 		for _, scalar := range []bool{false, true} {
-			for _, n := range []uint64{0, 16, 17, 64, 513, 8192} {
+			for _, n := range []uint64{0, 4, 8, 16, 17, 64, 513, 8192} {
 				b.Run(fmt.Sprintf("fp=%v/scalar=%v/n=%d", fp, scalar, n), func(b *testing.B) {
 					benchmarkDirectMap32(b, directMap32Fixture(b, fp, scalar), fp, n)
 				})
@@ -46,6 +46,9 @@ func BenchmarkCompileDirectMap32ARM64(b *testing.B) {
 }
 
 func benchmarkDirectMap32(b *testing.B, m *wasm.Module, fp bool, n uint64) {
+	benchmarkDirectMap32At(b, m, fp, n, 0, 32768)
+}
+func benchmarkDirectMap32At(b *testing.B, m *wasm.Module, fp bool, n, dst, src uint64) {
 	cm, err := CompileModuleWith(m, CompileOptions{})
 	if err != nil {
 		b.Fatal(err)
@@ -78,11 +81,11 @@ func benchmarkDirectMap32(b *testing.B, m *wasm.Module, fp bool, n uint64) {
 	if fp {
 		scale, bias = uint64(math.Float32bits(1.0000001)), uint64(math.Float32bits(-1))
 	}
-	for i, v := range []uint64{0, 32768, 0, n, scale, bias} {
+	for i, v := range []uint64{dst, src, 0, n, scale, bias} {
 		binary.LittleEndian.PutUint64(args[i*8:], v)
 	}
 	for i := uint64(0); i < n; i++ {
-		binary.LittleEndian.PutUint32(jm.LinearMemory()[32768+4*i:], uint32(i)+0x3f800001)
+		binary.LittleEndian.PutUint32(jm.LinearMemory()[src+4*i:], uint32(i)+0x3f800001)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -94,7 +97,13 @@ func benchmarkDirectMap32(b *testing.B, m *wasm.Module, fp bool, n uint64) {
 }
 
 func BenchmarkDirectMap32ConstantARM64(b *testing.B) {
-	for _, scale := range []uint32{1, 2, 3, 256, 1 << 31} {
+	for _, scale := range []uint32{0, 1, 2, 3, 256, 1 << 31} {
 		b.Run(fmt.Sprintf("scale=%x", scale), func(b *testing.B) { benchmarkDirectMap32(b, directMap32ConstantScale(b, false, scale), false, 8192) })
+	}
+}
+
+func BenchmarkDirectMap32ZeroOverlapARM64(b *testing.B) {
+	for _, n := range []uint64{513, 8192} {
+		b.Run(fmt.Sprintf("n=%d", n), func(b *testing.B) { benchmarkDirectMap32At(b, directMap32ConstantScale(b, false, 0), false, n, 4, 0) })
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 	coreruntime "github.com/wago-org/wago/src/core/runtime"
 )
@@ -15,7 +16,7 @@ import (
 func BenchmarkDirectMap32AMD64(b *testing.B) {
 	for _, fp := range []bool{false, true} {
 		for _, scalar := range []bool{false, true} {
-			for _, n := range []uint64{0, 16, 17, 64, 513, 8192} {
+			for _, n := range []uint64{0, 4, 8, 16, 17, 64, 513, 8192} {
 				b.Run(fmt.Sprintf("fp=%v/scalar=%v/n=%d", fp, scalar, n), func(b *testing.B) {
 					benchmarkDirectMap32(b, directMap32Fixture(b, fp, scalar), fp, n)
 				})
@@ -46,7 +47,13 @@ func BenchmarkCompileDirectMap32AMD64(b *testing.B) {
 }
 
 func benchmarkDirectMap32(b *testing.B, m *wasm.Module, fp bool, n uint64) {
-	cm, err := CompileModuleWith(m, CompileOptions{})
+	benchmarkDirectMap32WithOptions(b, m, fp, n, CompileOptions{})
+}
+func benchmarkDirectMap32WithOptions(b *testing.B, m *wasm.Module, fp bool, n uint64, opts CompileOptions) {
+	benchmarkDirectMap32At(b, m, fp, n, 0, 32768, opts)
+}
+func benchmarkDirectMap32At(b *testing.B, m *wasm.Module, fp bool, n, dst, src uint64, opts CompileOptions) {
+	cm, err := CompileModuleWith(m, opts)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -78,11 +85,11 @@ func benchmarkDirectMap32(b *testing.B, m *wasm.Module, fp bool, n uint64) {
 	if fp {
 		scale, bias = uint64(math.Float32bits(1.0000001)), uint64(math.Float32bits(-1))
 	}
-	for i, v := range []uint64{0, 32768, 0, n, scale, bias} {
+	for i, v := range []uint64{dst, src, 0, n, scale, bias} {
 		binary.LittleEndian.PutUint64(args[i*8:], v)
 	}
 	for i := uint64(0); i < n; i++ {
-		binary.LittleEndian.PutUint32(jm.LinearMemory()[32768+4*i:], uint32(i)+0x3f800001)
+		binary.LittleEndian.PutUint32(jm.LinearMemory()[src+4*i:], uint32(i)+0x3f800001)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -112,5 +119,37 @@ func BenchmarkCompileDirectMapF64ControlAMD64(b *testing.B) {
 		if cm.CodeImage != nil {
 			cm.CodeImage.Close()
 		}
+	}
+}
+
+func BenchmarkDirectMap32AVX2AMD64(b *testing.B) {
+	for _, fp := range []bool{false, true} {
+		for _, n := range []uint64{0, 4, 8, 16, 17, 64, 513, 8192} {
+			b.Run(fmt.Sprintf("fp=%v/n=%d", fp, n), func(b *testing.B) {
+				benchmarkDirectMap32WithOptions(b, directMap32Fixture(b, fp, false), fp, n, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline | shared.AMD64AVX2})
+			})
+		}
+	}
+}
+
+func BenchmarkDirectMap32ConstantAMD64(b *testing.B) {
+	for _, wide := range []bool{false, true} {
+		features := shared.AMD64ModernBaseline
+		if wide {
+			features |= shared.AMD64AVX2
+		}
+		for _, scale := range []uint32{0, 1, 2, 3, 256, 1 << 31} {
+			b.Run(fmt.Sprintf("avx2=%v/scale=%x", wide, scale), func(b *testing.B) {
+				benchmarkDirectMap32WithOptions(b, directMap32ConstantScale(b, false, scale), false, 8192, CompileOptions{AMD64FeaturesSet: true, AMD64Features: features})
+			})
+		}
+	}
+}
+
+func BenchmarkDirectMap32ZeroOverlapAMD64(b *testing.B) {
+	for _, n := range []uint64{513, 8192} {
+		b.Run(fmt.Sprintf("n=%d", n), func(b *testing.B) {
+			benchmarkDirectMap32At(b, directMap32ConstantScale(b, false, 0), false, n, 4, 0, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline | shared.AMD64AVX2})
+		})
 	}
 }

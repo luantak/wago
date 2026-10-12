@@ -19,8 +19,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 - Emit guarded native SIMD for qualified scalar i32/f32 map loops on AMD64 and ARM64,
   with the original scalar loop for fallback and tails. Unroll AMD64 maps
-  to four vectors per branch, with a vector cleanup loop and compact induction
-  snapshots. Unroll ARM64 maps
+  to four SSE vectors or two AVX vectors per branch, with AVX2 for wide integer
+  maps, a vector cleanup loop and compact induction snapshots. Simplify constant
+  integer maps and induction updates on both architectures, allowing safe overlap
+  for zero-scale maps while preserving source bounds and traps. Unroll ARM64 maps
   to eight vectors per branch with a vector cleanup loop, cheaper constant
   i32 multipliers, and reduced setup code and temporary stack space. Reuse bounded hints
   to reserve code capacity without adding allocations in the measured maps.
