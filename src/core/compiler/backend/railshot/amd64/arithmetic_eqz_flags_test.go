@@ -114,3 +114,55 @@ func TestArithmeticEqzRetainsAffineLEA(t *testing.T) {
 		}
 	}
 }
+
+func TestArithmeticEqzBranchFlags(t *testing.T) {
+	for _, wide := range []bool{false, true} {
+		for _, invert := range []bool{false, true} {
+			typ, xor, add, eqz := wasm.I32, byte(0x73), byte(0x6a), byte(0x45)
+			if wide {
+				typ, xor, add, eqz = wasm.I64, 0x85, 0x7c, 0x50
+			}
+			body := []byte{0, 0x3f, 0, 0x1a, 0x20, 0, 0x20, 1, xor, 0x20, 1, add, eqz}
+			if invert {
+				body = append(body, 0x45)
+			}
+			body = append(body, 0x04, 0x7f, 0x41, 7, 0x05, 0x41, 9, 0x0b, 0x0b)
+			m := mod1(t, []wasm.ValType{typ, typ}, []wasm.ValType{wasm.I32}, body)
+			m.Memories = []wasm.MemType{{Limits: wasm.Limits{Min: 1}}}
+			var stats ModuleStats
+			opts := CompileOptions{}
+			if diagnosticsEnabled {
+				opts.Stats = &stats
+			}
+			cm, e := CompileModuleWith(m, opts)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if cm.CodeImage != nil {
+				defer cm.CodeImage.Close()
+			}
+			if diagnosticsEnabled && stats.Funcs[0].Peephole["arithmetic-eqz-flags"] != 1 {
+				t.Fatal("missing branch flag reuse", stats.Funcs[0].Peephole)
+			}
+			for _, x := range []uint64{0, 1, 0x80000000, 0x8000000000000000, ^uint64(0)} {
+				for _, y := range []uint64{0, 1, 0x80000000, ^uint64(0)} {
+					v := (x ^ y) + y
+					if !wide {
+						v = uint64(uint32(v))
+					}
+					active := v == 0
+					if invert {
+						active = !active
+					}
+					want := uint64(9)
+					if active {
+						want = 7
+					}
+					if got := runCompiledAmd64u(t, cm, x, y); got != want {
+						t.Fatalf("wide=%v invert=%v x=%x y=%x got=%d want=%d", wide, invert, x, y, got, want)
+					}
+				}
+			}
+		}
+	}
+}

@@ -209,6 +209,12 @@ func (f *fn) condenseToFlags(node *elem) Cond {
 	}
 	w := node.valueType().is64()
 	if node.deferredOp() == opEqz {
+		if producer, ok := f.tryArithmeticZeroProducer(node); ok {
+			f.release(producer)
+			f.consumeBlockBelow(node)
+			f.erase(node)
+			return applyInvert(condE)
+		}
 		// TEST does not write its operand, so a register-resident value (a pinned
 		// local — e.g. a loop counter — or an owned temp) is tested in place with no
 		// copy, mirroring the relational path below.
