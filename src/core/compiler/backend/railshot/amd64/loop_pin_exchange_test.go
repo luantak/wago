@@ -143,3 +143,64 @@ func TestLoopPinPlanKeepsRegisterBanks(t *testing.T) {
 		t.Fatal("leased an unmaterialized zero or the wrong register bank")
 	}
 }
+
+func TestLoopPinInitialI32Parameter(t *testing.T) {
+	params := []wasm.ValType{wasm.I32}
+	for range 30 {
+		params = append(params, wasm.I64)
+	}
+	params = append(params, wasm.I32)
+	const counter, acc, result = 32, 33, 34
+	body := []byte{2, 1, 0x7f, 2, 0x7e, 0x41, 1, 0x21, counter, 3, 0x40}
+	first := true
+	for x := byte(1); x <= 30; x++ {
+		for range 8 {
+			body = append(body, 0x20, x)
+			if !first {
+				body = append(body, 0x7c)
+			}
+			first = false
+		}
+	}
+	body = append(body, 0x21, acc, 0x20, counter, 0x41, 1, 0x6b, 0x22, counter, 0x0d, 0, 0x0b,
+		0x20, 0, 0x21, counter, 0x02, 0x40, 0x20, counter, 0x45, 0x0d, 0, 3, 0x40,
+		0x20, 31, 0xad, 0x20, 31, 0xad, 0x7c, 0x20, 31, 0xad, 0x7c, 0x21, result,
+		0x20, counter, 0x41, 1, 0x6b, 0x22, counter, 0x0d, 0, 0x0b, 0x0b,
+		0x20, result, 0x20, acc, 0x7c, 0x20, 1, 0x7c, 0x10, 1, 0x0b)
+	m := modFuncs(t, funcDef{params, []wasm.ValType{wasm.I64}, body}, funcDef{[]wasm.ValType{wasm.I64}, []wasm.ValType{wasm.I64}, []byte{0, 0x20, 0, 0x0b}})
+	const input = uint64(0xface00008000000f)
+	for _, enabled := range []bool{false, true} {
+		for _, n := range []uint64{0, 1, 7} {
+			args := []uint64{n, uint64(1)<<63 | 1}
+			for range 29 {
+				args = append(args, 1)
+			}
+			args = append(args, input)
+			var stats ModuleStats
+			var statsArg *ModuleStats
+			if diagnosticsEnabled {
+				statsArg = &stats
+			}
+			opts := CompileOptions{Stats: statsArg, Optimizations: map[string]bool{"inline": false, "loop-pin-exchange": enabled}}
+			opts.AMD64FeaturesSet = true
+			cm, err := CompileModuleWith(m, opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := runCompiledAmd64u(t, cm, args...)
+			if cm.CodeImage != nil {
+				cm.CodeImage.Close()
+			}
+			want := uint64(1)<<63 | 241
+			if n != 0 {
+				want += 3 * uint64(uint32(args[len(args)-1]))
+			}
+			if got != want {
+				t.Fatalf("enabled=%v n=%d got=%x want=%x", enabled, n, got, want)
+			}
+			if diagnosticsEnabled && enabled && stats.Funcs[0].Peephole["loop-pin-exchange"] == 0 {
+				t.Fatal("initial i32 parameter was not promoted")
+			}
+		}
+	}
+}
