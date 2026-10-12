@@ -310,6 +310,7 @@ type fn struct {
 	interruptible           bool  // emit context-cancellation polls at entries and loop headers
 	hasLoop                 bool  // finalizer preserves emission-time loop layout until alignment fragments are relaxable
 	loopMemory              bool  // at least one source loop contains a memory operation
+	directMap32             bool  // bounded scalar i32/f32 map loop was seen by the hint scan
 	opaqueFragments         bool  // jump-table or plugin bytes require explicit fragment-aware scans
 	lazyZero                bool  // defer declared-local zeroing for small call+memory functions
 	skipFence               bool  // call-free leaf with a provably small frame: no stack-fence check
@@ -1761,12 +1762,21 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*a64.CompiledModule
 	// adapters/alignment. Reserve once so large modules do not repeatedly copy the
 	// accumulated native image as it grows.
 	totalBody := 0
+	mapReserve := 0
 	for i := range m.Code {
 		totalBody += len(m.Code[i].BodyBytes)
+		if allHints[i].map32HintCount() != 0 && mapReserve < map32ModuleReserveLimit && !inlineTargets.omitStandaloneBody(i, hostAdapters[i]) {
+			reserve := directMap32CodeReserve(m, i, allHints[i], &opts)
+			mapReserve += min(reserve, map32ModuleReserveLimit-mapReserve)
+		}
 	}
 	// Retain enough headroom for dense large images: a 3x estimate forced
 	// another allocation and copy of esbuild's entire code buffer.
 	codeCap := shared.TaperedModuleCodeCapacity(totalBody, n, 32, 28, 768<<10)
+	if maxReserve := int(^uint(0)>>1) - codeCap; mapReserve > maxReserve {
+		mapReserve = maxReserve
+	}
+	codeCap += mapReserve
 	moduleTypes := buildModuleTypeCache(m, totalBody)
 	classifier := wasm.NewModuleInstructionClassifier(m, true)
 	// A one-worker join pays for a second arena and copy. It wins for large bodies,
@@ -1842,7 +1852,7 @@ func compileModuleWith(m *wasm.Module, opts CompileOptions) (*a64.CompiledModule
 			}
 			code := codeBuffer.Bytes()
 			entry[i] = len(code)
-			tail, err := codeBuffer.AppendTail(asmCapForBody(len(m.Code[i].BodyBytes)))
+			tail, err := codeBuffer.AppendTail(asmCapForBody(len(m.Code[i].BodyBytes)) + directMap32CodeReserve(m, i, allHints[i], &opts))
 			if err != nil {
 				return nil, fmt.Errorf("arm64: grow code image: %w", err)
 			}
@@ -2026,6 +2036,10 @@ func compileModuleParallel(m *wasm.Module, opts CompileOptions, workers, codeCap
 				continue
 			}
 			layoutFlags := boolFlag(hostAdapters[i], layoutHostAdapter) | boolFlag(allHints[i].flags.has(hintHasLoop), layoutHasLoop) | boolFlag(allHints[i].flags.has(hintHasCall), layoutHasCall) | boolFlag(allHints[i].flags.has(hintCallsSelf), layoutCallsSelf)
+			if allHints[i].map32HintCount() != 0 {
+				ws.scratch.asm.B = ws.scratch.asm.B[:0]
+				ws.scratch.asm.Grow(asmCapForBody(len(m.Code[i].BodyBytes)) + directMap32CodeReserve(m, i, allHints[i], &opts))
+			}
 			hints := hintSidecar.viewAt(allHints[i], i)
 			fnCode, rl, internalOff, err := compileFunc(m, opts.Codegen.Module.GCTypeLayouts, i, hostAdapters[i], guardMode, boundsFacts, opts.Interruptible, modGlobals, &hints, immutableTable, opts.ImportBindings, opts.SyncHostCalls, opts.SyncHostSlots, opts.GCTypeSubtypingRefTest, opts.GCStructHelpers, opts.GCArrayHelpers, opts.GCFrameRoots.Function(i), opts.CustomInstructions, st, inlineTargets, allHints, policy, ws.scratch)
 			if err != nil {
@@ -3083,7 +3097,7 @@ func compileFuncAttempt(m *wasm.Module, gcTypeLayouts []codegen.GCTypeLayout, fu
 	localType, localSlot, locals, globalReg := f.localType, f.localSlot, f.locals, f.globalReg
 	mt0, _ := m.MemoryType(0)
 	boundedMemcopy := len(c.BodyBytes) <= 4096 && hints.memOpCount() <= 128
-	*f = fn{a: sc.asm, s: sc.stack, sc: sc, m: m, ft: ft, gcTypeLayouts: gcTypeLayouts, classifier: sc.classifier, transient: sc.transient, traceFuncIdx: uint32(globalIdx), tracePCBase: c.LocalDeclBytes, customInstructions: customInstructions, nParams: len(ft.Params), nLocals: nLocals, localType: localType, localSlot: localSlot, locals: locals, globalReg: globalReg[:0], guardMode: guardMode, boundsFacts: boundsFacts, interruptible: interruptible, hasLoop: hints.flags.has(hintHasLoop), loopMemory: hints.hasLoopMemory(), gcStructHelpers: gcStructHelpers, gcArrayHelpers: gcArrayHelpers, gcFrameRoots: gcFrameRoots, moduleEH: hints.flags.has(hintModuleEH), regMerge: policy.EnabledOption(optRegMerge), globalCellReg: regNone, memSizeReg: regNone, memLimitReg: regNone, trapCellReg: regNone, immutableLocalTable: immutableTable.local, immutableTableType: immutableTable.typeKey, immutableTableTyped: immutableTable.typed, monomorphicTarget: immutableTable.monomorphicTarget, importBindings: importBindings, stagedTailDescriptors: true, stats: stats, policy: policy, branchHints: m.BranchHintsForFunc(uint32(globalIdx)), branchHintLocalDecl: c.LocalDeclBytes, calleeHints: calleeHints, threadedMemory0: mt0.Shared, localFactsEnabled: policy.EnabledOption(optValueFacts) && !hints.flags.has(hintHasControlFlow), loadDefinedLocals: loadDefinedLocalMaskForHints(hints), memcopyTail4: policy.EnabledOption(optMemcopyTail4) && boundedMemcopy, memcopyQPairs: policy.EnabledOption(optMemcopyQPairs) && boundedMemcopy, floatLiteralPool: policy.EnabledOption(optFPLiteralPool) && len(c.BodyBytes) <= 16<<10}
+	*f = fn{a: sc.asm, s: sc.stack, sc: sc, m: m, ft: ft, gcTypeLayouts: gcTypeLayouts, classifier: sc.classifier, transient: sc.transient, traceFuncIdx: uint32(globalIdx), tracePCBase: c.LocalDeclBytes, customInstructions: customInstructions, nParams: len(ft.Params), nLocals: nLocals, localType: localType, localSlot: localSlot, locals: locals, globalReg: globalReg[:0], guardMode: guardMode, boundsFacts: boundsFacts, interruptible: interruptible, hasLoop: hints.flags.has(hintHasLoop), loopMemory: hints.hasLoopMemory(), directMap32: hints.map32HintCount() != 0, gcStructHelpers: gcStructHelpers, gcArrayHelpers: gcArrayHelpers, gcFrameRoots: gcFrameRoots, moduleEH: hints.flags.has(hintModuleEH), regMerge: policy.EnabledOption(optRegMerge), globalCellReg: regNone, memSizeReg: regNone, memLimitReg: regNone, trapCellReg: regNone, immutableLocalTable: immutableTable.local, immutableTableType: immutableTable.typeKey, immutableTableTyped: immutableTable.typed, monomorphicTarget: immutableTable.monomorphicTarget, importBindings: importBindings, stagedTailDescriptors: true, stats: stats, policy: policy, branchHints: m.BranchHintsForFunc(uint32(globalIdx)), branchHintLocalDecl: c.LocalDeclBytes, calleeHints: calleeHints, threadedMemory0: mt0.Shared, localFactsEnabled: policy.EnabledOption(optValueFacts) && !hints.flags.has(hintHasControlFlow), loadDefinedLocals: loadDefinedLocalMaskForHints(hints), memcopyTail4: policy.EnabledOption(optMemcopyTail4) && boundedMemcopy, memcopyQPairs: policy.EnabledOption(optMemcopyQPairs) && boundedMemcopy, floatLiteralPool: policy.EnabledOption(optFPLiteralPool) && len(c.BodyBytes) <= 16<<10}
 	state = f
 	f.adapterBacklink = sc.moduleNeedsAdapterBacklink(calleeHints)
 	if f.nParams >= 64 {

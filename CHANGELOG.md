@@ -17,7 +17,7 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   linear option resolution, cheaper loop/local-state scans and sufficient native
   image capacity to avoid reallocating dense large modules.
 
-- Emit guarded native SIMD for qualified scalar i32/f32 map loops on AMD64,
+- Emit guarded native SIMD for qualified scalar i32/f32 map loops on AMD64 and ARM64,
   with the original scalar loop for fallback and tails. Reuse bounded hints
   to reserve code capacity without adding allocations in the measured maps.
 - Admit exact typed i64 synchronous host callbacks to the private prepared
