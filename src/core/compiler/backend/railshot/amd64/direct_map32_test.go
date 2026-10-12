@@ -58,7 +58,7 @@ func TestDirectMap32Semantics(t *testing.T) {
 	for _, fp := range []bool{false, true} {
 		ref, candidate := directMap32Fixture(t, fp, true), directMap32Fixture(t, fp, false)
 		for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64ModernBaseline} {
-			for _, n := range []uint64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 31, 32, 33, 513, 8192} {
+			for _, n := range []uint64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 20, 24, 28, 31, 32, 33, 36, 40, 44, 48, 52, 56, 60, 63, 64, 65, 127, 128, 129, 513, 8192} {
 				for _, pair := range [][2]uint64{{128, 32768}, {129, 32769}, {128, 128}, {129, 128}, {128, 129}, {132, 128}, {128, 132}, {128, 65520}, {65520, 128}} {
 					setup := func(mem []byte) {
 						for i := range mem {
@@ -141,6 +141,117 @@ func TestDirectMap32Countdown(t *testing.T) {
 			b, bm, be := runMemAmd64WithOptions(t, directMap32Countdown(t, fp, false), opts, setup, 0, 32768, 0, n, scale, bias)
 			if ae != nil || be != nil || a != b || !bytes.Equal(am, bm) {
 				t.Fatal(fp, n, a, b, ae, be)
+			}
+		}
+	}
+}
+
+func TestDirectMap32LiveFloatParametersAMD64(t *testing.T) {
+	// Keep many float parameters live across the loop. Additional vector
+	// temporaries must never overwrite their homes or prevent scalar fallback.
+	for _, extra := range []int{10, 11, 12} {
+		var result uint64
+		var memory []byte
+		for _, scalar := range []bool{true, false} {
+			m := directMap32Fixture(t, true, scalar)
+			ft, _ := m.LocalFuncType(0)
+			for i := 0; i < extra; i++ {
+				ft.Params = append(ft.Params, wasm.F32)
+			}
+			body := m.Code[0].BodyBytes
+			body = bytes.ReplaceAll(body, []byte{0x22, 6}, []byte{0x22, byte(len(ft.Params))})
+			body = bytes.ReplaceAll(body, []byte{0x20, 6}, []byte{0x20, byte(len(ft.Params))})
+			body = body[:len(body)-1]
+			for i := 6; i < len(ft.Params); i++ {
+				body = append(body, 0x20, byte(i), 0xbc, 0x73)
+			}
+			m.Code[0].BodyBytes = append(body, 0x0b)
+			if err := wasm.ValidateModule(m); err != nil {
+				t.Fatal(err)
+			}
+			args := []uint64{0, 32768, 0, 65, uint64(math.Float32bits(1.0000001)), uint64(math.Float32bits(-1))}
+			for i := 0; i < extra; i++ {
+				args = append(args, uint64(math.Float32bits(float32(i)+0.25)))
+			}
+			setup := func(mem []byte) {
+				for i := 0; i < 65; i++ {
+					binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i)+0x3f800001)
+				}
+			}
+			if diagnosticsEnabled && !scalar && extra == 10 {
+				var stats ModuleStats
+				cm, err := CompileModuleWith(m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: &stats})
+				if err != nil {
+					t.Fatal(err)
+				}
+				cm.CodeImage.Close()
+				if stats.Funcs[0].Peephole["region-loop-map32"] == 0 {
+					t.Fatal("three-register map admission was lost under float pressure")
+				}
+			}
+			got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, setup, args...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scalar {
+				result, memory = got, mem
+			} else if got != result || !bytes.Equal(mem, memory) {
+				t.Fatalf("extra=%d changed live parameters or memory", extra)
+			}
+		}
+	}
+}
+
+func TestDirectMap32AffineEntryValuesAMD64(t *testing.T) {
+	for _, shape := range []string{"constants", "sum", "scaled", "addresses"} {
+		for _, n := range []uint64{16, 17, 31, 32, 65} {
+			var result uint64
+			var memory []byte
+			for _, scalar := range []bool{true, false} {
+				m := directMap32Fixture(t, false, scalar)
+				body := m.Code[0].BodyBytes
+				switch shape {
+				case "constants":
+					body = bytes.ReplaceAll(body, []byte{0x20, 4}, []byte{0x41, 3})
+					body = bytes.ReplaceAll(body, []byte{0x20, 5}, []byte{0x41, 7})
+				case "sum":
+					body = bytes.Replace(body, []byte{0x20, 4, 0x6c}, []byte{0x20, 4, 0x20, 5, 0x6a, 0x6c}, 1)
+				case "scaled":
+					body = bytes.Replace(body, []byte{0x20, 4, 0x6c}, []byte{0x20, 4, 0x41, 3, 0x6c, 0x41, 5, 0x6a, 0x6c}, 1)
+				case "addresses":
+					body = bytes.Replace(body, []byte{0x20, 0, 0x20, 1, 0x28}, []byte{0x20, 0, 0x41, 16, 0x6a, 0x20, 1, 0x41, 16, 0x6a, 0x28}, 1)
+				}
+				m.Code[0].BodyBytes = body
+				if err := wasm.ValidateModule(m); err != nil {
+					t.Fatal(err)
+				}
+				if !scalar && diagnosticsEnabled {
+					var stats ModuleStats
+					cm, err := CompileModuleWith(m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: &stats})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if cm.CodeImage != nil {
+						cm.CodeImage.Close()
+					}
+					if stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+						t.Fatalf("shape=%s did not select SIMD", shape)
+					}
+				}
+				setup := func(mem []byte) {
+					for i := 0; i < 100; i++ {
+						binary.LittleEndian.PutUint32(mem[32769+4*i:], uint32(i)*0x12345+7)
+					}
+				}
+				got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline}, setup, 129, 32769, 7, 7+n, 0xfffffff3, 0x80000001)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scalar {
+					result, memory = got, mem
+				} else if got != result || !bytes.Equal(mem, memory) {
+					t.Fatalf("shape=%s n=%d changed result or memory", shape, n)
+				}
 			}
 		}
 	}

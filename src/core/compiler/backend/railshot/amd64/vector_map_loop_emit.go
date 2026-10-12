@@ -52,6 +52,8 @@ type regionLoopEmitter struct {
 	gp              [4]Reg
 	fp              [10]Reg
 	slot            int
+	mapSaved        [regionLoopMaxLocals]uint8
+	mapSavedN       int
 	fails           [64]int
 	failN           int
 	streams         [10]regionMemoryStream
@@ -65,9 +67,21 @@ type regionLoopEmitter struct {
 	permanent       [regionLoopMaxOps + 1]bool
 }
 
-func (e *regionLoopEmitter) off(i int) int32 { return e.f.spillOff(e.slot + i) }
-func (e *regionLoopEmitter) fail(cc Cond)    { e.fails[e.failN] = e.f.a.JccPlaceholder(cc); e.failN++ }
+func (e *regionLoopEmitter) off(i int) int32 {
+	if e.mapSavedN != 0 {
+		if i < regionLoopMaxLocals {
+			return e.f.spillOff(e.slot + int(e.mapSaved[i]))
+		}
+		return e.f.spillOff(e.slot + e.mapSavedN + i - regionLoopMaxLocals)
+	}
+	return e.f.spillOff(e.slot + i)
+}
+func (e *regionLoopEmitter) fail(cc Cond) { e.fails[e.failN] = e.f.a.JccPlaceholder(cc); e.failN++ }
 func (e *regionLoopEmitter) affine(id uint8, dst, tmp Reg) {
+	if e.p.map32 {
+		e.map32Affine(id, dst, tmp)
+		return
+	}
 	n := e.p.nodes[id]
 	f := e.f
 	f.a.MovImm32(dst, int32(uint32(n.bits)))
@@ -107,13 +121,17 @@ func (e *regionLoopEmitter) rangeCheck(s *regionMemoryStream) {
 	a, b, c, d := e.gp[0], e.gp[1], e.gp[2], e.gp[3]
 	e.affine(s.address, a, d)
 	f.a.Load32(b, RSP, e.off(8))
-	f.a.AluRI(aluTable[opSub].digit, b, 1, true)
-	if s.stride == 0 {
-		f.a.Xor32(b, b)
-	} else if s.stride != 1 {
-		f.a.ImulRI(b, int32(s.stride), true)
+	if e.p.map32 {
+		f.a.ShiftImm(4, b, 2, true)
+	} else {
+		f.a.AluRI(aluTable[opSub].digit, b, 1, true)
+		if s.stride == 0 {
+			f.a.Xor32(b, b)
+		} else if s.stride != 1 {
+			f.a.ImulRI(b, int32(s.stride), true)
+		}
+		f.a.AluRI(aluTable[opAdd].digit, b, int32(s.width), true)
 	}
-	f.a.AluRI(aluTable[opAdd].digit, b, int32(s.width), true)
 	f.a.MovReg64(c, a)
 	f.a.Add64(c, b)
 	f.a.MovImm64(d, 1<<32)
@@ -134,6 +152,9 @@ func (e *regionLoopEmitter) guards() {
 		e.map32EarlyCount()
 	}
 	for i, l := range p.locals[:p.localN] {
+		if p.map32 && l.step == 0 {
+			continue
+		}
 		d := f.locals[l.index]
 		switch {
 		case d.state == lsConstZero:
@@ -851,7 +872,13 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	memSize, memLease := f.memSizeReg, f.memSizeRegionalLease
 	slots := regionLoopSlots
 	if p.map32 {
-		slots = 11
+		for i, l := range p.locals[:p.localN] {
+			if l.step != 0 {
+				e.mapSaved[i] = uint8(e.mapSavedN)
+				e.mapSavedN++
+			}
+		}
+		slots = e.mapSavedN + 3
 	}
 	if p.wide {
 		slots += 3
@@ -892,14 +919,22 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	}
 	mask := entryF.union(f.fpinned).union(f.fpinnedLocalMask).union(f.fconstMask()).union(f.v128ConstMask())
 	n = 0
+	allocNeed := need
+	if p.map32 {
+		allocNeed = 6
+	}
 	for reg := Reg(0); reg < 16; reg++ {
-		if !mask.has(reg) && f.fregUser[reg] == nil && n < need {
+		if !mask.has(reg) && f.fregUser[reg] == nil && n < allocNeed {
 			e.fp[n] = reg
 			n++
 		}
 	}
-	if n != need {
+	if n < need {
 		valid = false
+	} else if p.map32 && n < allocNeed {
+		for i := 3; i < allocNeed; i++ {
+			e.fp[i] = e.fp[0]
+		}
 	}
 	var written [256]bool
 	for _, l := range p.locals[:p.localN] {
@@ -1016,6 +1051,10 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 // A read-only invariant must be disjoint: broadcasting it cannot observe a
 // preceding iteration's write. All ranges were proved in-bounds first.
 func (e *regionLoopEmitter) aliasGuards() {
+	if e.p.map32 {
+		e.map32AliasGuards()
+		return
+	}
 	f, p := e.f, e.p
 	a, b, c, d := e.gp[0], e.gp[1], e.gp[2], e.gp[3]
 	for _, destination := range e.storeStream[:p.storeN] {

@@ -32,8 +32,8 @@ func TestDirectMap32OriginalSourcePositions(t *testing.T) {
 					n++
 				}
 			}
-			if n < 2 {
-				t.Fatalf("opcode=%x original pc=%d source ranges=%d; both bodies need their original source", op, pc, n)
+			if n < 3 {
+				t.Fatalf("opcode=%x original pc=%d source ranges=%d; scalar, unrolled, and cleanup bodies need their original source", op, pc, n)
 			}
 		}
 	}
