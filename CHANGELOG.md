@@ -9,7 +9,7 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 ### Changed
 
 - Combine bounded ARM64 scalar shift and mask pairs with existing bitfield
-  encodings.
+  encodings, including masks applied before an unsigned right shift.
 
 - Improve ARM64 execution with guarded scalar and vector loop lowering, bounded
   register reuse, borrowed operands, indexed address reuse, exact integer dot
