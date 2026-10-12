@@ -8,8 +8,6 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
-- Reuse known local destinations for deferred SUB/XOR sources of ARM64 bitfield pairs.
-
 - Combine bounded ARM64 scalar shift and mask pairs with existing bitfield
   encodings.
 
