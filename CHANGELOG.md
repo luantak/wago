@@ -26,7 +26,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   for zero-scale maps while preserving source bounds and traps. Unroll ARM64 maps
   to eight vectors per branch with a vector cleanup loop, cheaper constant
   i32 multipliers, and reduced setup code and temporary stack space. Reuse bounded hints
-  to reserve code capacity without adding allocations in the measured maps.
+  to reserve code capacity without adding allocations in the measured maps. Reduce
+  loop planning cost by decoding constants once and preserving affine dependency
+  masks across constant induction updates. Share ARM64 branch-pair and stack
+  store/load finalization scans while retaining branch-target safety.
 - Admit exact typed i64 synchronous host callbacks to the private prepared
   integer route when the bounded-work and detached-context proofs hold. Other
   callback shapes retain their existing route; each synchronous host binding

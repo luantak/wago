@@ -101,15 +101,20 @@ func (f *fn) finalizePeepholes(entryOffsets ...int) {
 			}
 		}
 	}
-	if f.opt(optBranchFold) {
+	branchFold, storeLoadFwd := f.opt(optBranchFold), f.opt(optStoreLoadFwd)
+	if branchFold {
 		f.foldSingleBitBranches(b, n, targets)
-		f.foldBranchPairs(b, n, targets)
+	}
+	if branchFold || storeLoadFwd {
+		f.foldBranchPairsAndStoreLoads(b, n, targets, branchFold, storeLoadFwd && !threadCandidate)
 	}
 	if threadCandidate {
 		f.threadTakenZeroBranches(b, n, targets)
-	}
-	if f.opt(optStoreLoadFwd) {
-		f.forwardStoreLoads(b, n, targets)
+		// Threading can add branch targets. Preserve its proof boundary before
+		// forwarding loads when this function has a threading candidate.
+		if storeLoadFwd {
+			f.foldBranchPairsAndStoreLoads(b, n, targets, false, true)
+		}
 	}
 	if f.opt(optCommonExitCompare) {
 		f.foldCommonExitCompares(b, n, targets, entryOffsets...)
@@ -234,12 +239,21 @@ func (f *fn) foldSingleBitBranches(b []byte, n int, targets []uint64) {
 // expected a branch. We prove that by collecting every PC-relative branch
 // target first and only folding pairs whose middle word is not among them.
 
-func (f *fn) foldBranchPairs(b []byte, n int, targets []uint64) {
+// Branch pairs and SP store/load pairs have disjoint instruction classes.
+// Their replacements cannot introduce or remove candidates for the other fold,
+// so sharing a scan preserves both rewrites and their branch-target checks.
+func (f *fn) foldBranchPairsAndStoreLoads(b []byte, n int, targets []uint64, branches, stores bool) {
 	b = b[:n:n]
 	for pc := 0; pc <= len(b)-8; pc += 4 {
 		w := rdWord(b, pc)
 		cc, ok := bcondSkipOne(w) // B.cond whose displacement is exactly +2 words
-		if !ok {
+		if !branches || !ok {
+			// Avoid calling the full forwarding proof for non-stack stores.
+			if stores {
+				if _, _, _, ok := spStoreImm(w); ok && f.forwardStoreLoadAt(b, n, pc, targets, true) {
+					pc += 4
+				}
+			}
 			continue
 		}
 		mid := pc + 4
@@ -268,7 +282,7 @@ func (f *fn) foldBranchPairs(b []byte, n int, targets []uint64) {
 	}
 }
 
-// forwardStoreLoads rewrites an SP-relative store immediately followed by a load
+// forwardStoreLoadAt rewrites an SP-relative store immediately followed by a load
 // of the same slot at the same width — `STR Xs,[SP,#k] ; LDR Xd,[SP,#k]` — into
 // the store plus `MOV Xd,Xs` (or a NOP when Xd==Xs), forwarding the just-stored
 // value instead of round-tripping it through memory. The store is kept: a later
@@ -279,15 +293,6 @@ func (f *fn) foldBranchPairs(b []byte, n int, targets []uint64) {
 // Correct because the two instructions are adjacent (nothing rewrites the slot or
 // SP between them) and only fired when nothing branches to the load: an external
 // entrant that skipped the store must genuinely load from memory.
-
-func (f *fn) forwardStoreLoads(b []byte, n int, targets []uint64) {
-	b = b[:n:n]
-	for pc := 0; pc <= len(b)-8; pc += 4 {
-		if f.forwardStoreLoadAt(b, n, pc, targets, true) {
-			pc += 4 // step past the word we just rewrote
-		}
-	}
-}
 
 func (f *fn) forwardStoreLoadAt(b []byte, n, pc int, targets []uint64, recordHole bool) bool {
 	rs, k, w64, ok := spStoreImm(rdWord(b, pc))

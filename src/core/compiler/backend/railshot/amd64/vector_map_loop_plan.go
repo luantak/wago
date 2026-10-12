@@ -69,18 +69,10 @@ type regionLoopPlan struct {
 	reductionLoad                [2]uint8
 }
 
+// add appends a canonical node; affine constructors keep bits and uses exact.
 func (p *regionLoopPlan) add(n regionLoopNode) uint8 {
 	if p.nodeN == regionLoopMaxOps {
 		return 0
-	}
-	if n.op == 0 {
-		n.bits = uint64(uint32(n.bits))
-		n.uses = 0
-		for i, c := range n.coeff {
-			if c != 0 {
-				n.uses |= 1 << i
-			}
-		}
 	}
 	p.nodeN++
 	p.nodes[p.nodeN] = n
@@ -99,7 +91,7 @@ func (p *regionLoopPlan) local(index uint32, typ machineType) (uint8, bool) {
 	i := p.localN
 	n := regionLoopNode{}
 	if typ == mtI32 {
-		n.coeff[i] = 1
+		n.coeff[i], n.uses = 1, 1<<i
 	} else {
 		n.op, n.bits, n.uses = 0x20, uint64(i), 1<<i
 	}
@@ -120,14 +112,24 @@ func (p *regionLoopPlan) integer(op byte, a, b uint8) uint8 {
 	switch op {
 	case 0x6a, 0x6b:
 		if op == 0x6b {
-			y.bits = uint64(-uint32(y.bits))
-			for i := range y.coeff {
-				y.coeff[i] = -y.coeff[i]
-			}
+			x.bits = uint64(uint32(x.bits) - uint32(y.bits))
+		} else {
+			x.bits = uint64(uint32(x.bits) + uint32(y.bits))
 		}
-		x.bits = uint64(uint32(x.bits) + uint32(y.bits))
+		// The common induction update changes only the constant term.
+		if y.uses == 0 {
+			return p.add(x)
+		}
+		x.uses = 0
 		for i := range x.coeff {
-			x.coeff[i] += y.coeff[i]
+			if op == 0x6b {
+				x.coeff[i] -= y.coeff[i]
+			} else {
+				x.coeff[i] += y.coeff[i]
+			}
+			if x.coeff[i] != 0 {
+				x.uses |= 1 << i
+			}
 		}
 	case 0x6c, 0x74:
 		if op == 0x74 {
@@ -142,8 +144,14 @@ func (p *regionLoopPlan) integer(op byte, a, b uint8) uint8 {
 			return 0
 		}
 		x.bits = uint64(uint32(x.bits) * uint32(y.bits))
-		for i := range x.coeff {
-			x.coeff[i] *= uint32(y.bits)
+		if x.uses != 0 {
+			x.uses = 0
+			for i := range x.coeff {
+				x.coeff[i] *= uint32(y.bits)
+				if x.coeff[i] != 0 {
+					x.uses |= 1 << i
+				}
+			}
 		}
 	default:
 		return 0
@@ -181,9 +189,16 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 		if err != nil {
 			return false
 		}
-		look := r
 		var imm wasm.InstructionImmediate
-		if classifier.ClassifyInto(&r, op, &imm) != nil || r.Offset() > regionLoopMaxBytes {
+		// Decode only the planner's grammar. Constants are read once below;
+		// memory immediates retain the module's width and multi-memory rules.
+		switch op {
+		case 0x20, 0x21, 0x22, 0x0c, 0x0d:
+			imm.Index, err = r.U32()
+		case 0x28, 0x2a, 0x2b, 0x36, 0x38, 0x39:
+			err = classifier.ClassifyInto(&r, op, &imm)
+		}
+		if err != nil {
 			return false
 		}
 		var id uint8
@@ -210,19 +225,19 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 				continue
 			}
 		case 0x41:
-			x, err := look.I32()
+			x, err := r.I32()
 			if err != nil {
 				return false
 			}
 			id = p.add(regionLoopNode{bits: uint64(uint32(x))})
 		case 0x43:
-			x, err := look.Bytes(4)
+			x, err := r.Bytes(4)
 			if err != nil {
 				return false
 			}
 			id = p.add(regionLoopNode{op: op, bits: uint64(binary.LittleEndian.Uint32(x))})
 		case 0x44:
-			x, err := look.Bytes(8)
+			x, err := r.Bytes(8)
 			if err != nil {
 				return false
 			}
