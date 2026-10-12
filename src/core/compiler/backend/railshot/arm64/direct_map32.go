@@ -20,7 +20,7 @@ func (p *regionLoopPlan) qualifyMap32() bool {
 			return false
 		}
 	} else {
-		if p.nodes[p.limit].op != 0 || p.nodes[p.limit].bits != 0 {
+		if p.headerCount != 0 || p.nodes[p.limit].op != 0 || p.nodes[p.limit].bits != 0 {
 			return false
 		}
 		limitInputs := 0
@@ -308,6 +308,7 @@ func (e *regionLoopEmitter) loadCurrentLocal(local int, dst Reg) {
 
 func (e *regionLoopEmitter) body(checkedTail int) {
 	f, p := e.f, e.p
+	recordSources := profileEnabled && f.stats != nil && f.stats.RecordSources
 	oldPC := f.wasmPC
 	add := p.nodes[p.stores[0].value]
 	mul := p.nodes[add.left]
@@ -327,35 +328,48 @@ func (e *regionLoopEmitter) body(checkedTail int) {
 	f.st64(SP, e.off(8), e.gp[2])
 	f.a.LsrImm32(e.gp[2], e.gp[2], 2)
 	top := f.a.Len()
-	f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
-	previous := f.enterProfileInstruction()
+	var previous profileOrigin
+	if recordSources {
+		f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
+		previous = f.enterProfileInstruction()
+	}
 	f.a.LdrQIdx(e.fp[0], linMemReg, e.gp[1], 0)
-	f.switchProfileOrigin(previous)
-	f.wasmPC = f.tracePCBase + mul.pos
-	previous = f.enterProfileInstruction()
+	if recordSources {
+		f.switchProfileOrigin(previous)
+		f.wasmPC = f.tracePCBase + mul.pos
+		previous = f.enterProfileInstruction()
+	}
 	if p.nodes[p.loads[0].node].op == 0x2a {
 		f.a.NeonFmul(e.fp[0], e.fp[0], e.fp[1], false)
-		f.switchProfileOrigin(previous)
-		f.wasmPC = f.tracePCBase + add.pos
-		previous = f.enterProfileInstruction()
+		if recordSources {
+			f.switchProfileOrigin(previous)
+			f.wasmPC = f.tracePCBase + add.pos
+			previous = f.enterProfileInstruction()
+		}
 		if add.op == 0x92 {
 			f.a.NeonFadd(e.fp[0], e.fp[0], e.fp[2], false)
 		}
 	} else {
 		f.a.NeonMulS(e.fp[0], e.fp[0], e.fp[1])
-		f.switchProfileOrigin(previous)
-		f.wasmPC = f.tracePCBase + add.pos
-		previous = f.enterProfileInstruction()
+		if recordSources {
+			f.switchProfileOrigin(previous)
+			f.wasmPC = f.tracePCBase + add.pos
+			previous = f.enterProfileInstruction()
+		}
 		if add.op == 0x6a {
 			f.a.NeonAddS(e.fp[0], e.fp[0], e.fp[2])
 		}
 	}
-	f.switchProfileOrigin(previous)
-	f.wasmPC = f.tracePCBase + p.stores[0].pos
-	previous = f.enterProfileInstruction()
+	if recordSources {
+		f.switchProfileOrigin(previous)
+		f.wasmPC = f.tracePCBase + p.stores[0].pos
+		previous = f.enterProfileInstruction()
+	}
 	f.a.StrQIdx(linMemReg, e.gp[0], e.fp[0], 0)
-	f.switchProfileOrigin(previous)
-	f.wasmPC = oldPC
+	if recordSources {
+		f.switchProfileOrigin(previous)
+		f.wasmPC = oldPC
+	}
 	f.a.AddImm64(e.gp[0], e.gp[0], 16)
 	f.a.AddImm64(e.gp[1], e.gp[1], 16)
 	f.a.SubsImm32(e.gp[2], e.gp[2], 1)

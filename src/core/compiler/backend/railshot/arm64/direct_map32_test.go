@@ -129,6 +129,48 @@ func TestDirectMap32SemanticsARM64(t *testing.T) {
 	}
 }
 
+func TestDirectMap32RejectsNonCountdownHeaderExitARM64(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		var want uint64
+		var expected []byte
+		for _, scalar := range []bool{true, false} {
+			m := directMap32Fixture(t, fp, scalar)
+			body := m.Code[0].BodyBytes
+			at := bytes.Index(body, []byte{0x03, 0x40})
+			if at < 0 {
+				t.Fatal("loop marker missing")
+			}
+			header := []byte{0x20, 2, 0x45, 0x0d, 1}
+			body = append(append(append([]byte(nil), body[:at+2]...), header...), body[at+2:]...)
+			m.Code[0].BodyBytes = body
+			if err := wasm.ValidateModule(m); err != nil {
+				t.Fatal(err)
+			}
+			var stats ModuleStats
+			opts := CompileOptions{}
+			if diagnosticsEnabled {
+				opts.Stats = &stats
+			}
+			got, mem, err := runMemArm64WithOptions(t, m, opts, func(mem []byte) {
+				for i := 0; i < 64; i++ {
+					binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i)+1)
+				}
+			}, 0, 32768, 0, 64, 3, 7)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !scalar && diagnosticsEnabled && stats.Funcs[0].Peephole["region-loop-map32"] != 0 {
+				t.Fatal("non-countdown header exit was vectorized")
+			}
+			if scalar {
+				want, expected = got, mem
+			} else if got != want || !bytes.Equal(mem, expected) {
+				t.Fatal("ignored header exit changed locals or memory", fp)
+			}
+		}
+	}
+}
+
 func directMap32Countdown(t testing.TB, fp, scalar bool) *wasm.Module {
 	t.Helper()
 	m := directMap32Fixture(t, fp, scalar)
@@ -224,6 +266,17 @@ func TestDirectMap32RecognitionAllocationsARM64(t *testing.T) {
 }
 
 func TestDirectMap32CapacityHintARM64(t *testing.T) {
+	packed := funcHints{immediateFreeOps: streamingReductionHintMask | 17 | 2<<map32I32HintShift | 1<<map32F32HintShift}
+	if got := packed.immediateFreeOpCount(); got != 17 {
+		t.Fatalf("packed density=%d, want 17", got)
+	}
+	if got := packed.map32HintCount(); got != 3 {
+		t.Fatalf("packed map hints=%d, want 3", got)
+	}
+	if !packed.hasStreamingReduction() {
+		t.Fatal("packed streaming-reduction hint was lost")
+	}
+
 	for _, fp := range []bool{false, true} {
 		m := directMap32Fixture(t, fp, false)
 		ft, _ := m.LocalFuncType(0)
@@ -237,5 +290,21 @@ func TestDirectMap32CapacityHintARM64(t *testing.T) {
 		if got := directMap32CodeReserve(m, 0, hints.funcHints, &CompileOptions{}); got != map32CodeReserve {
 			t.Fatalf("fp=%v reserve=%d, want %d", fp, got, map32CodeReserve)
 		}
+	}
+
+	m := directMap32Fixture(t, false, false)
+	body := m.Code[0].BodyBytes
+	body = append(append(append([]byte(nil), body[:len(body)-1]...), bytes.Repeat([]byte{0x01}, regionLoopMaxBytes)...), 0x0b)
+	m.Code[0].BodyBytes = body
+	if err := wasm.ValidateModule(m); err != nil {
+		t.Fatal(err)
+	}
+	ft, _ := m.LocalFuncType(0)
+	hints, err := scanFuncBody(m.Code[0], len(ft.Params)+1, 0, 0, nil, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := hints.map32HintCount(); got != 0 {
+		t.Fatalf("oversize body map hints=%d, want 0", got)
 	}
 }

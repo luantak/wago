@@ -40,6 +40,44 @@ func TestDirectMap32RecognitionAllocations(t *testing.T) {
 	}
 }
 
+func TestDirectMap32RejectsNonCountdownHeaderExit(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		var want uint64
+		var expected []byte
+		for _, scalar := range []bool{true, false} {
+			m := directMap32Fixture(t, fp, scalar)
+			body := m.Code[0].BodyBytes
+			at := bytes.Index(body, []byte{0x03, 0x40})
+			if at < 0 {
+				t.Fatal("loop marker missing")
+			}
+			header := []byte{0x20, 2, 0x45, 0x0d, 1}
+			body = append(append(append([]byte(nil), body[:at+2]...), header...), body[at+2:]...)
+			m.Code[0].BodyBytes = body
+			if err := wasm.ValidateModule(m); err != nil {
+				t.Fatal(err)
+			}
+			var stats ModuleStats
+			got, mem, err := runMemAmd64WithOptions(t, m, CompileOptions{AMD64FeaturesSet: true, AMD64Features: shared.AMD64ModernBaseline, Stats: optionalTestStats(&stats)}, func(mem []byte) {
+				for i := 0; i < 64; i++ {
+					binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i)+1)
+				}
+			}, 0, 32768, 0, 64, 3, 7)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !scalar && diagnosticsEnabled && stats.Funcs[0].Peephole["region-loop-map32"] != 0 {
+				t.Fatal("non-countdown header exit was vectorized")
+			}
+			if scalar {
+				want, expected = got, mem
+			} else if got != want || !bytes.Equal(mem, expected) {
+				t.Fatal("ignored header exit changed locals or memory", fp)
+			}
+		}
+	}
+}
+
 func TestDirectMap32AscendingSteps(t *testing.T) {
 	for _, fp := range []bool{false, true} {
 		for _, step := range []byte{1, 2, 4} {
