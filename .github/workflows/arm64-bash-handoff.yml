@@ -1,7 +1,7 @@
-name: ARM64 Bash handoff diagnosis
+name: ARM64 Bash adapter comparison
 on:
   push:
-    branches: [codex/diagnose-arm64-bash-handoff]
+    branches: [codex/diagnose-arm64-bash-adapter]
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,18 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: original Git launcher
+          - name: paired adapters on original Git launcher
             bash: ''
             trace: '0'
-          - name: traced Git launcher
-            bash: ''
-            trace: '1'
-          - name: traced Git interpreter
-            bash: 'C:\Program Files\Git\usr\bin\bash.exe'
-            trace: '1'
-          - name: traced MSYS2 interpreter
-            bash: 'C:\msys64\usr\bin\bash.exe'
-            trace: '1'
     env:
       GO_VERSION: '1.27.1'
     steps:
@@ -108,10 +99,10 @@ jobs:
             Pop-Location
           }
 
-      - name: Bounded repeated Bash child observations after full context
+      - name: Repeat the paired adapter control after full context
         if: always()
         shell: pwsh
         env:
           WAGO_DIAG_BASH: ${{ matrix.bash }}
           WAGO_DIAG_TRACE: ${{ matrix.trace }}
-        run: go test -v -count=50 -run '^TestBashCompletionPassesNestedCommandWords$' ./cli/manager/internal/config
+        run: go test -v -count=1 -run '^TestPairedBashCompletionAdapters$' ./cli/manager/internal/config

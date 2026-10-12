@@ -123,6 +123,21 @@ func TestBashCompletionPassesNestedCommandWords(t *testing.T) {
 	}
 }
 
+// This temporary paired control changes only the adapter source, retaining
+// the native helper, Git launcher, nested arguments and output assertion.
+func TestPairedBashCompletionAdapters(t *testing.T) {
+	for observation := 0; observation < 20; observation++ {
+		for offset := 0; offset < 2; offset++ {
+			mode := (observation + offset) % 2
+			t.Run(fmt.Sprintf("observation_%02d_mode_%d", observation, mode), func(t *testing.T) {
+				t.Setenv("WAGO_DIAG_SYNC", fmt.Sprint(mode))
+				t.Setenv("WAGO_DIAG_TRACE", "1")
+				TestBashCompletionPassesNestedCommandWords(t)
+			})
+		}
+	}
+}
+
 func TestZshCompletionPassesNestedCommandWords(t *testing.T) {
 	zsh, err := exec.LookPath("zsh")
 	if err != nil {

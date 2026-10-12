@@ -27,6 +27,22 @@ func Completion(shell string) (string, error) {
 			"}\n" +
 			"compdef _wago wago\n", nil
 	case "bash":
+		if os.Getenv("WAGO_DIAG_SYNC") == "1" {
+			return "_wago_complete() {\n" +
+				"  local candidate candidates\n" +
+				"  COMPREPLY=()\n" +
+				"  candidates=$(command wago __complete \"${COMP_WORDS[@]:1}\") || true\n" +
+				"  if [[ -n $candidates ]]; then\n" +
+				"    while IFS= read -r candidate; do\n" +
+				"      COMPREPLY+=(\"$candidate\")\n" +
+				"    done <<< \"$candidates\"\n" +
+				"  fi\n" +
+				"  if (( ${#COMPREPLY[@]} == 0 )); then\n" +
+				"    compopt -o default 2>/dev/null || true\n" +
+				"  fi\n" +
+				"}\n" +
+				"complete -o bashdefault -o default -F _wago_complete wago\n", nil
+		}
 		return "_wago_complete() {\n" +
 			"  local candidate\n" +
 			"  COMPREPLY=()\n" +
