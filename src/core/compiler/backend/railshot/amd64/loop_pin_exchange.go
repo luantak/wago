@@ -98,6 +98,9 @@ func (f *fn) applyLoopPinExchange(plan uint64) {
 		old := int(entry&0x7f) - 1
 		newLocal := int((entry >> 7) & 0x3f)
 		reg := Reg((entry >> 13) & 0xf)
+		if diagnosticsEnabled && (f.localType[old] != mtI32 || f.localType[newLocal] != mtI32 || f.locals[newLocal].state != lsMem) {
+			f.stats.peep("loop-pin-new")
+		}
 		if !f.usesCalls || f.locals[old].state == lsReg {
 			f.storeLocalReg(old, reg, f.locals[old].isFloat)
 		}
