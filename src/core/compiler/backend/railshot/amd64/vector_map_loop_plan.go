@@ -178,6 +178,10 @@ func regionLoopReader(r wasm.Reader) wasm.Reader {
 // inspectRegionLoop reads the body after an empty loop block type. The caller's
 // reader is unchanged, including on rejection. No allocations or unbounded scan.
 func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.ModuleInstructionClassifier, p *regionLoopPlan) bool {
+	return inspectRegionLoopWithMap32(r, types, classifier, p, true)
+}
+
+func inspectRegionLoopWithMap32(r wasm.Reader, types []machineType, classifier wasm.ModuleInstructionClassifier, p *regionLoopPlan, map32 bool) bool {
 	*p = regionLoopPlan{}
 	start := r.Offset()
 	r = regionLoopReader(r)
@@ -187,6 +191,9 @@ func inspectRegionLoop(r wasm.Reader, types []machineType, classifier wasm.Modul
 		position := uint32(start + r.Offset())
 		op, err := r.Byte()
 		if err != nil {
+			return false
+		}
+		if !map32 && (op == 0x28 || op == 0x2a || op == 0x36 || op == 0x38 || op == 0x43 || op == 0x92 || op == 0x94) {
 			return false
 		}
 		var imm wasm.InstructionImmediate

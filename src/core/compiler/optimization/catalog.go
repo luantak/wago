@@ -439,6 +439,7 @@ var catalog = []Definition{
 	experimentalAMD64("bmi2-rorx", "BMI2 rotates", "use non-destructive immediate rotates on BMI2 hosts"),
 	amd64("avx512-ternary", "AVX-512 ternary SIMD", "fuse adjacent 128-bit vector boolean operations on AVX-512VL hosts"),
 	amd64("avx512-vrotate", "AVX-512 vector rotates", "select packed rotate instructions for exact i32x4 rotate idioms on AVX-512VL hosts"),
+	both("loop-pin-exchange", "Loop local registers", "borrow inactive scalar local registers inside bounded single-exit loops"),
 	amd64("callfree-loop-reg-state", "Call-free loop register state", "keep written pinned locals register-resident across simple call-free loop backedges"),
 	arm64("leaf-scratch-pins", "Leaf scratch pins", "pin scratch values in leaf functions"),
 	arm64("leaf-scratch-memsize", "Leaf scratch memory size", "cache memory size in backend scratch for straight-line regional leaves"),

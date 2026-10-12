@@ -6,12 +6,13 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 )
 
 // A small straight-line loop may borrow an inactive function pin. Its previous
-// value is homed before the loop and restored on the loop's only exit. Keep the
-// default on the platform with native correctness and performance qualification.
+// value is homed before the loop and restored on the loop's only exit. Integer
+// and floating-point banks stay separate, while widths may share a register.
 // WAGO_AMD64_NO_LOOP_PIN_EXCHANGE=1 is the rollback switch.
 var loopPinExchangeEnabled = runtime.GOOS == "linux" && os.Getenv("WAGO_AMD64_NO_LOOP_PIN_EXCHANGE") != "1"
 
@@ -25,106 +26,70 @@ func (f *fn) planLoopPinExchange(r *wasm.Reader) (uint64, uint64) {
 	if f.nLocals == 0 || f.nLocals > 64 || f.localBase != 0 || f.moduleEH || len(f.customInstructions) != 0 || f.intervalActive != 0 || len(f.pinnedLocals) == 0 {
 		return 0, 0
 	}
-	look := *r
-	start := look.Offset()
-	var reads, writes [64]uint8
-	var written uint64
-	var imm wasm.InstructionImmediate
-	backedge := false
-	closed := false
-	for step := 0; step < 96 && look.Offset()-start <= 512; step++ {
-		op, err := look.Byte()
-		if err != nil || f.classifier.ClassifyInto(&look, op, &imm) != nil {
-			return 0, 0
-		}
-		if backedge {
-			if op != 0x0b {
-				return 0, 0
-			}
-			closed = true
-			break
-		}
-		if op == 0x0d && imm.Index == 0 {
-			backedge = true
+	// If every initialized scalar local already has a register, or no pin
+	// shares an unpinned local's bank, the body cannot benefit from a lease.
+	var candidates, pins uint8
+	for x, local := range f.locals[:f.nLocals] {
+		if !loopPinScalar(f.localType[x]) || local.state == lsConstZero {
 			continue
 		}
-		if op == 0x0b || !loopPinAllowed(op) {
-			return 0, 0
+		bank := uint8(1)
+		if f.localType[x].isFloat() {
+			bank = 2
 		}
-		switch imm.Kind {
-		case wasm.InstrLocalGet:
-			if imm.Index >= uint32(f.nLocals) {
-				return 0, 0
-			}
-			if reads[imm.Index] != 255 {
-				reads[imm.Index]++
-			}
-		case wasm.InstrLocalSet, wasm.InstrLocalTee:
-			if imm.Index >= uint32(f.nLocals) {
-				return 0, 0
-			}
-			if writes[imm.Index] != 255 {
-				writes[imm.Index]++
-			}
-			written |= uint64(1) << imm.Index
+		if local.reg == regNone {
+			candidates |= bank
+		} else {
+			pins |= bank
 		}
 	}
-	if !closed {
+	if candidates&pins == 0 {
+		return 0, 0
+	}
+	reads, writes, written, ok := shared.LoopLocalUsage(r, f.classifier, f.nLocals)
+	if !ok {
 		return 0, 0
 	}
 	var plan uint64
 	var selected uint64
 	for count := 0; count < 2; count++ {
-		bestNew, bestScore := -1, 0
+		oldByBank := [2]int{-1, -1}
+		for _, old := range f.pinnedLocals {
+			if selected&(uint64(1)<<old) != 0 || !loopPinScalar(f.localType[old]) || reads[old] != 0 || writes[old] != 0 || f.locals[old].state == lsConstZero {
+				continue
+			}
+			bank := 0
+			if f.localType[old].isFloat() {
+				bank = 1
+			}
+			if oldByBank[bank] == -1 {
+				oldByBank[bank] = old
+			}
+		}
+		bestNew, bestOld, bestScore := -1, -1, 0
 		for x := 0; x < f.nLocals; x++ {
-			if selected&(uint64(1)<<x) != 0 || f.locals[x].reg != regNone || f.localType[x] != mtI32 || f.locals[x].state != lsMem {
+			if selected&(uint64(1)<<x) != 0 || f.locals[x].reg != regNone || !loopPinScalar(f.localType[x]) || f.locals[x].state == lsConstZero {
 				continue
 			}
 			score := int(reads[x])*2 + int(writes[x])
-			if score > bestScore {
-				bestNew, bestScore = x, score
-			}
-		}
-		if bestScore < 6 {
-			break
-		}
-		bestOld := -1
-		for _, x := range f.pinnedLocals {
-			if selected&(uint64(1)<<x) != 0 || f.localType[x] != mtI32 || reads[x] != 0 || writes[x] != 0 || f.locals[x].state == lsConstZero {
+			if score <= bestScore || score < 6 {
 				continue
 			}
-			bestOld = x
-			break
+			bank := 0
+			if f.localType[x].isFloat() {
+				bank = 1
+			}
+			if old := oldByBank[bank]; old != -1 {
+				bestNew, bestOld, bestScore = x, old, score
+			}
 		}
-		if bestOld == -1 {
+		if bestNew == -1 {
 			break
 		}
 		plan |= loopPinEntry(bestOld, bestNew, f.locals[bestOld].reg) << (count * loopPinBits)
 		selected |= uint64(1)<<bestOld | uint64(1)<<bestNew
 	}
 	return plan, written
-}
-
-func loopPinAllowed(op byte) bool {
-	switch {
-	case op == 0x01 || op == 0x1a || op == 0x1b: // nop, drop, select
-		return true
-	case op >= 0x20 && op <= 0x22: // local get/set/tee
-		return true
-	case op >= 0x28 && op <= 0x3e: // scalar loads/stores
-		return true
-	case op >= 0x41 && op <= 0x44: // numeric constants
-		return true
-	case op >= 0x45 && op <= 0x66: // numeric comparisons
-		return true
-	case op >= 0x67 && op <= 0xa6: // numeric arithmetic
-		return true
-	case op >= 0xa7 && op <= 0xbf: // numeric conversions
-		return true
-	case op >= 0xc0 && op <= 0xc4: // sign extension
-		return true
-	}
-	return false
 }
 
 func (f *fn) applyLoopPinExchange(plan uint64) {
@@ -134,12 +99,13 @@ func (f *fn) applyLoopPinExchange(plan uint64) {
 		newLocal := int((entry >> 7) & 0x3f)
 		reg := Reg((entry >> 13) & 0xf)
 		if !f.usesCalls || f.locals[old].state == lsReg {
-			f.storeLocalReg(old, reg, false)
+			f.storeLocalReg(old, reg, f.locals[old].isFloat)
 		}
 		f.locals[old].reg = regNone
 		f.locals[old].state = lsMem
 		f.locals[newLocal].reg = reg
-		f.loadLocalReg(newLocal, reg, false)
+		f.locals[newLocal].isFloat = f.localType[newLocal].isFloat()
+		f.loadLocalReg(newLocal, reg, f.locals[newLocal].isFloat)
 		f.locals[newLocal].state = lsStackReg
 		for i, x := range f.pinnedLocals {
 			if x == old {
@@ -159,9 +125,9 @@ func (f *fn) restoreLoopPinExchange(plan uint64, reachable bool) {
 		reg := Reg((entry >> 13) & 0xf)
 		if reachable {
 			if !f.usesCalls || f.locals[newLocal].state == lsReg {
-				f.storeLocalReg(newLocal, reg, false)
+				f.storeLocalReg(newLocal, reg, f.locals[newLocal].isFloat)
 			}
-			f.loadLocalReg(old, reg, false)
+			f.loadLocalReg(old, reg, f.locals[old].isFloat)
 		}
 		f.locals[newLocal].reg = regNone
 		f.locals[newLocal].state = lsMem
@@ -175,4 +141,8 @@ func (f *fn) restoreLoopPinExchange(plan uint64, reachable bool) {
 		}
 		plan >>= loopPinBits
 	}
+}
+
+func loopPinScalar(typ machineType) bool {
+	return typ == mtI32 || typ == mtI64 || typ == mtF32 || typ == mtF64
 }

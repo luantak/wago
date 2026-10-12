@@ -1492,7 +1492,23 @@ func scanLoopCallFreeDetails(r *wasm.Reader, classifier wasm.ModuleInstructionCl
 		if err != nil {
 			return false, 0, storage{}, false
 		}
-		if err = classifier.ClassifyInto(&r2, op, &imm); err != nil {
+		imm = wasm.InstructionImmediate{}
+		switch {
+		case op >= 0x45 && op <= 0xc4:
+			// Scalar operators have no immediates or call effects.
+		case op >= 0x20 && op <= 0x22:
+			imm.Index, err = r2.U32()
+			if op == 0x20 {
+				imm.Kind = wasm.InstrLocalGet
+			} else if op == 0x21 {
+				imm.Kind = wasm.InstrLocalSet
+			} else {
+				imm.Kind = wasm.InstrLocalTee
+			}
+		default:
+			err = classifier.ClassifyInto(&r2, op, &imm)
+		}
+		if err != nil {
 			used := min(maxCallFreeLoopLookaheadBytes-*budget, r2.Offset()-before)
 			*budget += used
 			return false, 0, storage{}, false
@@ -1641,7 +1657,7 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 	loopFloatConstOK := false
 	var loopPinPlan uint64
 	var loopPinWrites uint64
-	if kind == cfLoop && !f.unreachable && pN == 0 && rN == 0 && loopPinExchangeEnabled {
+	if kind == cfLoop && !f.unreachable && pN == 0 && rN == 0 && f.opt(optLoopPinExchange) {
 		loopPinPlan, loopPinWrites = f.planLoopPinExchange(r)
 	}
 	if kind == cfLoop && !f.unreachable && f.usesCalls && !f.callFreeRegMerges() && !f.moduleEH && len(f.customInstructions) == 0 {

@@ -1673,6 +1673,11 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 	// of a frame slot. Excludes loops (params, back-edge) and multi-value.
 	fr.set(ctrlRegMerge1, f.regMerge && (kind == cfBlock || kind == cfIf) && rN == 1 && res0 != mtNone && res0 != mtV128)
 	fr.set(ctrlCallFreeRegion, callFreeLoopRegionEnabled && kind != cfLoop && f.inCallFreeLoop())
+	var loopPinPlan uint64
+	if kind == cfLoop && !f.unreachable && pN == 0 && rN == 0 && f.opt(optLoopPinExchange) {
+		loopPinPlan, _ = f.planLoopPinExchange(r)
+	}
+
 	if kind == cfLoop && !f.unreachable && ((diagnosticsEnabled && f.stats != nil) || f.usesCalls && (f.pinnedLocalMask != 0 || f.fpinnedLocalMask != 0)) {
 		base := len(f.loopSetLocals)
 		uses, collectConsts := f.scopedLoopConstUses()
@@ -1766,7 +1771,20 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 		}
 		f.flush()
 		if kind == cfLoop {
-			if pN == 0 && rN == 0 {
+			if loopPinPlan != 0 {
+				f.applyLoopPinExchange(loopPinPlan)
+				// The proof excludes nested control, so only one lease can be
+				// active while this function's bytecode is compiled.
+				f.loopPinPlan = loopPinPlan
+				// The loop's backedge uses the temporary homes. Forward frames outside
+				// it continue to use the original homes, restored at its only exit.
+				f.setFrameBranchState(&fr, packedLocStates{})
+				if !fr.has(ctrlLoopCallFree) || !callFreeLoopRegionEnabled {
+					f.convergeFrameBranchState(&fr)
+				}
+				f.stats.peep("loop-pin-exchange")
+			}
+			if loopPinPlan == 0 && pN == 0 && rN == 0 {
 				f.emitPureReduce(r)
 				if f.loopMemory {
 					f.emitDotLoop(r)
@@ -2778,6 +2796,10 @@ func (f *fn) opEnd(r *wasm.Reader) error {
 	}
 	f.finishDotLoop(last + 1)
 	f.finishPureReduce(last + 1)
+	if fr.kind == cfLoop && f.loopPinPlan != 0 {
+		f.restoreLoopPinExchange(f.loopPinPlan, endReachable)
+		f.loopPinPlan = 0
+	}
 	f.releaseCtrlMerge(&fr)
 	f.freeEndsBuf(ends)
 	f.releaseFrameBaseTypes(&fr)

@@ -788,7 +788,7 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 		return false, nil
 	}
 	var p regionLoopPlan
-	if !inspectRegionLoop(look, f.localType, f.classifier, &p) {
+	if !inspectRegionLoopWithMap32(look, f.localType, f.classifier, &p, f.map32Loops) {
 		return false, nil
 	}
 	map32SSE2 := false

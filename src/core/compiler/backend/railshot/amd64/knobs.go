@@ -10,6 +10,7 @@ import (
 // The binding inventory is checked against the amd64 Optimization Definitions
 // during package initialization. Public sense is always "on = enabled".
 var optimizationBindings = optimization.NewBindings("amd64",
+	optimization.Bind("loop-pin-exchange", &loopPinExchangeEnabled),
 	optimization.Bind("bounds-facts", &boundsFactsEnabled),
 	optimization.Bind("simd-superopt", &simdSuperoptEnabled),
 	optimization.Bind("simd-reduction-borrow", &simdReductionBorrowEnabled),
@@ -86,6 +87,7 @@ var (
 	optDirectGoHostImport      = optimizationBindings.Option("direct-go-host-import")
 	optWideLoopIntConst        = optimizationBindings.Option("wide-loop-int-const")
 	optCompactLoopAlign32      = optimizationBindings.Option("compact-loop-align32")
+	optLoopPinExchange         = optimizationBindings.Option("loop-pin-exchange")
 	optCountedLoopLatch        = optimizationBindings.Option("counted-loop-latch")
 	optLinearSumLoop           = optimizationBindings.Option("linear-sum-loop")
 	optCallFreeLoopColdExit    = optimizationBindings.Option("callfree-loop-cold-exit")

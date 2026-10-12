@@ -17,7 +17,12 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   linear option resolution, cheaper loop/local-state scans and sufficient native
   image capacity to avoid reallocating dense large modules.
 
-- Emit guarded native SIMD for qualified scalar i32/f32 map loops on AMD64 and ARM64,
+- Improve scalar and SIMD loops on AMD64 and ARM64. Promote frequently used i32,
+  i64, f32 and f64 locals into inactive registers inside bounded single-exit
+  loops, preserving register classes, typed homes and the original trap order.
+  Skip promotion analysis when no compatible register can be borrowed, keep
+  candidate selection linear, and avoid redundant ARM64 loop-entry spills.
+  Emit guarded native SIMD for qualified scalar i32/f32 map loops,
   with the original scalar loop for fallback and tails. SSE2 and base NEON form
   the base layer; enable SSE4.1/AVX/AVX2 map paths from detected CPU and OS support.
   Unroll AMD64 maps to four SSE vectors or two AVX vectors per branch, with
@@ -28,7 +33,9 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   i32 multipliers, and reduced setup code and temporary stack space. Reuse bounded hints
   to reserve code capacity without adding allocations in the measured maps. Reduce
   loop planning cost by decoding constants once and preserving affine dependency
-  masks across constant induction updates. Share ARM64 branch-pair and stack
+  masks across constant induction updates. Gate AMD64's additional map grammar
+  with existing hints, and decode common scalar/local instructions directly
+  during call-free loop proofs. Share ARM64 branch-pair and stack
   store/load finalization scans while retaining branch-target safety.
 - Admit exact typed i64 synchronous host callbacks to the private prepared
   integer route when the bounded-work and detached-context proofs hold. Other

@@ -10,6 +10,7 @@ import (
 // The binding inventory is checked against the arm64 Optimization Definitions
 // during package initialization. Public sense is always "on = enabled".
 var optimizationBindings = optimization.NewBindings("arm64",
+	optimization.Bind("loop-pin-exchange", &loopPinExchangeEnabled),
 	optimization.Bind("bounds-facts", &boundsFactsEnabled),
 	optimization.Bind("simd-superopt", &simdSuperoptEnabled),
 	optimization.Bind("interval-region-pins", &intervalRegionPinsEnabled),
@@ -168,6 +169,7 @@ var (
 	optValueFacts           = optimizationBindings.Option("value-facts")
 	optLoadPair             = optimizationBindings.Option("load-pair")
 	optMergeNextUse         = optimizationBindings.Option("merge-next-use")
+	optLoopPinExchange      = optimizationBindings.Option("loop-pin-exchange")
 	optCountedLoopLatch     = optimizationBindings.Option("counted-loop-latch")
 	optCallFreeLoopColdExit = optimizationBindings.Option("callfree-loop-cold-exit")
 	optWeightedScalarMerge  = optimizationBindings.Option("weighted-scalar-merge")

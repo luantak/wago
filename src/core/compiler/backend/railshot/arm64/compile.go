@@ -389,6 +389,7 @@ type fn struct {
 	branchHintLocalDecl uint32
 	branchHintUnlikely  bool
 	innermostLoop       uint32 // control depth of the nearest loop; zero outside loops
+	loopPinPlan         uint64 // Only a proven loop without nested control may hold a lease.
 	unreachable         bool   // in dead code after an unconditional branch/trap
 
 	// Call state (Phase 4).

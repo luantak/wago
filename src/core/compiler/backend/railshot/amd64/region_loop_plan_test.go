@@ -90,3 +90,25 @@ func TestRegionLoopRejectsTruncatedMap(t *testing.T) {
 		}
 	}
 }
+
+func TestRegionLoopMapHintGatesGrammar(t *testing.T) {
+	for _, fp := range []bool{false, true} {
+		m := directMap32Fixture(t, fp, false)
+		ft, _ := m.LocalFuncType(0)
+		var types []machineType
+		for _, v := range ft.Params {
+			types = append(types, mtOf(v))
+		}
+		types = append(types, mtOf(ft.Params[4]))
+		at := bytes.Index(m.Code[0].BodyBytes, []byte{3, 0x40}) + 2
+		r := wasm.ReaderFrom(m.Code[0].BodyBytes[at:])
+		classifier := wasm.NewModuleInstructionClassifier(m, false)
+		var p regionLoopPlan
+		if inspectRegionLoopWithMap32(r, types, classifier, &p, false) {
+			t.Fatal("unhinted 32-bit loop accepted")
+		}
+		if !inspectRegionLoopWithMap32(r, types, classifier, &p, true) || !p.qualifyMap32() {
+			t.Fatal("hinted map rejected")
+		}
+	}
+}
