@@ -8,7 +8,7 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
-- Materialize scalar floating equality and inequality with a cleared result and a parity-aware conditional move.
+- Materialize scalar floating self-comparisons with one full-width parity result and no GP temporary.
 
 - Improve ARM64 execution with guarded scalar and vector loop lowering, bounded
   register reuse, borrowed operands, indexed address reuse, exact integer dot
