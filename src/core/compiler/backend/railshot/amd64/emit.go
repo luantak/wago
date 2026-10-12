@@ -734,22 +734,6 @@ func (f *fn) condenseShift(node *elem, dest Reg) Reg {
 // producing a 0/1 i32 result. (Fusing compares directly into branches is a later
 // optimization; Phase 1 materializes the boolean.)
 func (f *fn) condenseCompare(node *elem, dest Reg) Reg {
-	if node.deferredOp() == opEqz {
-		if producer, ok := f.tryArithmeticZeroProducer(node); ok {
-			if dest == regNone {
-				dest = producer
-			}
-			f.a.SetccReg(condE, dest)
-			if producer != dest {
-				f.release(producer)
-			}
-			f.consumeBlockBelow(node)
-			f.occupy(node, dest)
-			node.st.typ = mtI32
-			node.setDeferredOp(opNone)
-			return dest
-		}
-	}
 	foldedCC, folded := f.tryMemoryCompareToFlags(node)
 	if !folded {
 		foldedCC, folded = f.tryMaskedEqzToFlags(node)
