@@ -8,8 +8,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
-- Select BMI2 variable shifts on supported AMD64 CPUs and reuse ARM64
-  variable-shift source registers; preserve immediate shifts and CPU fallback.
+- Reuse ARM64 variable-shift source and count registers in ordinary scalar
+  lowering.
 
 - Improve ARM64 execution with guarded scalar and vector loop lowering, bounded
   register reuse, borrowed operands, indexed address reuse, exact integer dot
