@@ -10,6 +10,7 @@ import (
 
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 	coreruntime "github.com/wago-org/wago/src/core/runtime"
+	"github.com/wago-org/wago/tests/support/wasmtest"
 )
 
 func directMap32Fixture(t testing.TB, fp, scalar bool) *wasm.Module {
@@ -378,6 +379,112 @@ func TestDirectMap32LiveFloatParametersARM64(t *testing.T) {
 				result, memory = got, mem
 			} else if got != result || !bytes.Equal(mem, memory) {
 				t.Fatalf("extra=%d changed live parameters or memory", extra)
+			}
+		}
+	}
+}
+
+func TestDirectMap32AffineEntryValuesARM64(t *testing.T) {
+	for _, shape := range []string{"constants", "sum", "scaled", "addresses"} {
+		for _, n := range []uint64{16, 17, 31, 32, 65} {
+			var result uint64
+			var memory []byte
+			for _, scalar := range []bool{true, false} {
+				m := directMap32Fixture(t, false, scalar)
+				body := m.Code[0].BodyBytes
+				switch shape {
+				case "constants":
+					body = bytes.ReplaceAll(body, []byte{0x20, 4}, []byte{0x41, 3})
+					body = bytes.ReplaceAll(body, []byte{0x20, 5}, []byte{0x41, 7})
+				case "sum":
+					body = bytes.Replace(body, []byte{0x20, 4, 0x6c}, []byte{0x20, 4, 0x20, 5, 0x6a, 0x6c}, 1)
+				case "scaled":
+					body = bytes.Replace(body, []byte{0x20, 4, 0x6c}, []byte{0x20, 4, 0x41, 3, 0x6c, 0x41, 5, 0x6a, 0x6c}, 1)
+				case "addresses":
+					body = bytes.Replace(body, []byte{0x20, 0, 0x20, 1, 0x28}, []byte{0x20, 0, 0x41, 16, 0x6a, 0x20, 1, 0x41, 16, 0x6a, 0x28}, 1)
+				}
+				m.Code[0].BodyBytes = body
+				if err := wasm.ValidateModule(m); err != nil {
+					t.Fatal(err)
+				}
+				if !scalar && diagnosticsEnabled {
+					var stats ModuleStats
+					cm, err := CompileModuleWith(m, CompileOptions{Stats: &stats})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if cm.CodeImage != nil {
+						cm.CodeImage.Close()
+					}
+					if stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+						t.Fatalf("shape=%s did not select SIMD", shape)
+					}
+				}
+				setup := func(mem []byte) {
+					for i := 0; i < 100; i++ {
+						binary.LittleEndian.PutUint32(mem[32769+4*i:], uint32(i)*0x12345+7)
+					}
+				}
+				got, mem, err := runMemArm64WithOptions(t, m, CompileOptions{}, setup, 129, 32769, 7, 7+n, 0xfffffff3, 0x80000001)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scalar {
+					result, memory = got, mem
+				} else if got != result || !bytes.Equal(mem, memory) {
+					t.Fatalf("shape=%s n=%d changed result or memory", shape, n)
+				}
+			}
+		}
+	}
+}
+
+func directMap32ConstantScale(t testing.TB, scalar bool, scale uint32) *wasm.Module {
+	t.Helper()
+	m := directMap32Fixture(t, false, scalar)
+	value := append([]byte{0x41}, wasmtest.SLEB32(int32(scale))...)
+	value = append(value, 0x6c)
+	m.Code[0].BodyBytes = bytes.Replace(m.Code[0].BodyBytes, []byte{0x20, 4, 0x6c}, value, 1)
+	if err := wasm.ValidateModule(m); err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+func TestDirectMap32ConstantScaleARM64(t *testing.T) {
+	for _, scale := range []uint32{0, 1, 2, 3, 4, 8, 256, 1 << 30, 1 << 31, 0xffffffff} {
+		for _, n := range []uint64{0, 1, 15, 16, 17, 31, 32, 33, 65} {
+			var result uint64
+			var memory []byte
+			for _, scalar := range []bool{true, false} {
+				m := directMap32ConstantScale(t, scalar, scale)
+				if !scalar && diagnosticsEnabled {
+					var stats ModuleStats
+					cm, err := CompileModuleWith(m, CompileOptions{Stats: &stats})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if cm.CodeImage != nil {
+						cm.CodeImage.Close()
+					}
+					if stats.Funcs[0].Peephole["region-loop-map32"] != 1 {
+						t.Fatalf("scale=%x did not select SIMD", scale)
+					}
+				}
+				setup := func(mem []byte) {
+					for i := 0; i < 100; i++ {
+						binary.LittleEndian.PutUint32(mem[32769+4*i:], uint32(i)*0xabcdef+0x80000001)
+					}
+				}
+				got, mem, err := runMemArm64WithOptions(t, m, CompileOptions{}, setup, 129, 32769, 0, n, 0, 0x80000001)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scalar {
+					result, memory = got, mem
+				} else if got != result || !bytes.Equal(mem, memory) {
+					t.Fatalf("scale=%x n=%d changed result or memory", scale, n)
+				}
 			}
 		}
 	}

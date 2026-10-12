@@ -6,7 +6,7 @@ import "github.com/wago-org/wago/src/core/compiler/wasm"
 
 const (
 	// Guards, eight-vector body, vector cleanup, and local commits.
-	map32CodeReserve          = 768
+	map32CodeReserve          = 512
 	map32FunctionReserveLimit = 4 * map32CodeReserve
 	map32ModuleReserveLimit   = 1 << 20
 	map32I32HintShift         = 9

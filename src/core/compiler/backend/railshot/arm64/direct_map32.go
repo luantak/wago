@@ -2,7 +2,10 @@
 
 package arm64
 
-import "github.com/wago-org/wago/src/core/compiler/wasm"
+import (
+	"github.com/wago-org/wago/src/core/compiler/wasm"
+	"math/bits"
+)
 
 func (p *regionLoopPlan) map32Int(id uint8) bool {
 	n := p.nodes[id]
@@ -111,42 +114,77 @@ type regionEntryLocal struct {
 }
 
 type regionLoopEmitter struct {
-	f     *fn
-	p     *regionLoopPlan
-	gp    [4]Reg
-	fp    [6]Reg
-	slot  int
-	fails [16]int
-	failN int
+	f        *fn
+	p        *regionLoopPlan
+	gp       [4]Reg
+	fp       [6]Reg
+	slot     int
+	saved    [regionLoopMaxLocals]uint8
+	savedN   int
+	intShift int8 // -1 multiplies; 0 elides; 1..31 shifts.
+	fails    [16]int
+	failN    int
 }
 
-func (e *regionLoopEmitter) off(i int) int32 { return e.f.spillOff(e.slot + i) }
+func (e *regionLoopEmitter) off(i int) int32 {
+	if i < regionLoopMaxLocals {
+		return e.f.spillOff(e.slot + int(e.saved[i]))
+	}
+	return e.f.spillOff(e.slot + e.savedN + i - regionLoopMaxLocals)
+}
 
 func (e *regionLoopEmitter) fail(cond Cond) {
 	e.fails[e.failN] = e.f.a.Bcond(cond)
 	e.failN++
 }
 
+// Qualification excludes input reads of written, non-induction locals.
+func (e *regionLoopEmitter) entryLocal(local int, dst Reg) {
+	if e.p.locals[local].step != 0 {
+		e.f.ld32(dst, SP, e.off(local))
+	} else {
+		e.loadCurrentLocal(local, dst)
+	}
+}
+
 func (e *regionLoopEmitter) affine(id uint8, dst, tmp Reg) {
 	n := e.p.nodes[id]
 	f := e.f
-	f.a.MovImm32(dst, int32(uint32(n.bits)))
+	initialized := uint32(n.bits) != 0
+	if initialized {
+		f.a.MovImm32(dst, int32(uint32(n.bits)))
+	}
 	for i, c := range n.coeff {
 		if c == 0 {
 			continue
 		}
-		f.ld32(tmp, SP, e.off(i))
+		term := tmp
+		if !initialized {
+			term = dst
+		}
+		e.entryLocal(i, term)
 		if c != 1 {
 			f.a.MovImm32(e.gp[2], int32(c))
-			f.a.Mul32(tmp, tmp, e.gp[2])
+			f.a.Mul32(term, term, e.gp[2])
 		}
-		f.a.Add32(dst, dst, tmp)
+		if initialized {
+			f.a.Add32(dst, dst, term)
+		}
+		initialized = true
+	}
+	if !initialized {
+		f.a.MovImm32(dst, 0)
 	}
 }
 
 func (e *regionLoopEmitter) copyEntryLocals() {
 	f := e.f
 	for i, l := range e.p.locals[:e.p.localN] {
+		// Only evolving induction locals need their entry value saved.
+		// Invariant homes survive both the vector body and local commits.
+		if l.step == 0 {
+			continue
+		}
 		d := f.locals[l.index]
 		switch {
 		case d.state == lsConstZero:
@@ -252,7 +290,12 @@ func (e *regionLoopEmitter) broadcast(id uint8, reg Reg) {
 	if n.op == 0x43 {
 		e.f.a.MovImm32(e.gp[3], int32(n.bits))
 	} else if n.op == 0x20 {
-		e.f.ld32(e.gp[3], SP, e.off(int(n.bits)))
+		d := e.f.locals[e.p.locals[n.bits].index]
+		if d.reg != regNone && d.state != lsMem && d.state != lsConstZero {
+			e.f.a.NeonDupS(reg, d.reg)
+			return
+		}
+		e.entryLocal(int(n.bits), e.gp[3])
 	} else {
 		e.affine(id, e.gp[3], e.gp[1])
 	}
@@ -349,7 +392,11 @@ func (e *regionLoopEmitter) vectors(count int, offset int32) {
 		}
 	} else {
 		for i := 0; i < count; i++ {
-			f.a.NeonMulS(regs[i], regs[i], e.fp[1])
+			if e.intShift < 0 {
+				f.a.NeonMulS(regs[i], regs[i], e.fp[1])
+			} else if e.intShift != 0 {
+				f.a.NeonShlS(regs[i], regs[i], uint8(e.intShift))
+			}
 		}
 		if recordSources {
 			f.switchProfileOrigin(previous)
@@ -383,7 +430,18 @@ func (e *regionLoopEmitter) body(checkedTail int) {
 	if add.op == 0x94 || add.op == 0x6c {
 		mul = add
 	}
-	e.broadcast(mul.right, e.fp[1])
+	e.intShift = -1
+	scale := p.nodes[mul.right]
+	if mul.op == 0x6c && scale.op == 0 && scale.uses == 0 {
+		v := uint32(scale.bits)
+		// i32 multiplication wraps, including a scale of 0x80000000.
+		if v != 0 && v&(v-1) == 0 {
+			e.intShift = int8(bits.TrailingZeros32(v))
+		}
+	}
+	if e.intShift < 0 {
+		e.broadcast(mul.right, e.fp[1])
+	}
 	if add.op == 0x92 || add.op == 0x6a {
 		e.broadcast(add.right, e.fp[2])
 	}
@@ -534,7 +592,13 @@ func (f *fn) tryDirectMap32(r *wasm.Reader) (bool, error) {
 		return true, nil
 	}
 	f.patchBranch26(toFast, f.a.Len())
-	e.slot = f.allocSpillSlots(11)
+	for i, l := range p.locals[:p.localN] {
+		if l.step != 0 {
+			e.saved[i] = uint8(e.savedN)
+			e.savedN++
+		}
+	}
+	e.slot = f.allocSpillSlots(e.savedN + 3)
 	oldPinned, oldFPinned := f.pinned, f.fpinned
 	for _, reg := range e.gp {
 		f.pinned = f.pinned.add(reg)
