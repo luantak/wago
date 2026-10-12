@@ -153,3 +153,13 @@ func BenchmarkDirectMap32ZeroOverlapAMD64(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkDirectMap32SSE2AMD64(b *testing.B) {
+	for _, fp := range []bool{false, true} {
+		for _, n := range []uint64{16, 513, 8192} {
+			b.Run(fmt.Sprintf("fp=%v/n=%d", fp, n), func(b *testing.B) {
+				benchmarkDirectMap32WithOptions(b, directMap32Fixture(b, fp, false), fp, n, CompileOptions{AMD64FeaturesSet: true})
+			})
+		}
+	}
+}

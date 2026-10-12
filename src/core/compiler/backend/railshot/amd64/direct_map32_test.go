@@ -46,9 +46,11 @@ func TestDirectMap32Selection(t *testing.T) {
 				t.Fatal(err)
 			}
 			cm.CodeImage.Close()
-			want := fp || features&shared.AMD64SSE41 != 0
-			if got := stats.Funcs[0].Peephole["region-loop-map32"] != 0; got != want {
-				t.Fatalf("fp=%v features=%d SIMD=%v want=%v stats=%v", fp, features, got, want, stats.Funcs[0].Peephole)
+			if features == 0 && cm.RequiredAMD64Features != 0 {
+				t.Fatalf("SSE2 map requires optional features: %x", cm.RequiredAMD64Features)
+			}
+			if got := stats.Funcs[0].Peephole["region-loop-map32"] != 0; !got {
+				t.Fatalf("fp=%v features=%d SIMD=%v stats=%v", fp, features, got, stats.Funcs[0].Peephole)
 			}
 		}
 	}

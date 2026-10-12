@@ -25,7 +25,7 @@ func directMap32ConstantScale(t testing.TB, scalar bool, scale uint32) *wasm.Mod
 }
 
 func TestDirectMap32ConstantScaleAMD64(t *testing.T) {
-	for _, features := range []shared.AMD64Features{shared.AMD64SSE41, shared.AMD64ModernBaseline, shared.AMD64ModernBaseline | shared.AMD64AVX2} {
+	for _, features := range []shared.AMD64Features{0, shared.AMD64SSE41, shared.AMD64ModernBaseline, shared.AMD64ModernBaseline | shared.AMD64AVX2} {
 		opts := CompileOptions{AMD64FeaturesSet: true, AMD64Features: features}
 		for _, scale := range []uint32{0, 1, 2, 3, 4, 8, 256, 1 << 30, 1 << 31, 0xffffffff} {
 			for _, n := range []uint64{0, 1, 15, 16, 17, 31, 32, 33, 65} {

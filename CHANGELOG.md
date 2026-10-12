@@ -18,9 +18,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   image capacity to avoid reallocating dense large modules.
 
 - Emit guarded native SIMD for qualified scalar i32/f32 map loops on AMD64 and ARM64,
-  with the original scalar loop for fallback and tails. Unroll AMD64 maps
-  to four SSE vectors or two AVX vectors per branch, with AVX2 for wide integer
-  maps, a vector cleanup loop and compact induction snapshots. Simplify constant
+  with the original scalar loop for fallback and tails. SSE2 and base NEON form
+  the base layer; enable SSE4.1/AVX/AVX2 map paths from detected CPU and OS support.
+  Unroll AMD64 maps to four SSE vectors or two AVX vectors per branch, with
+  a vector cleanup loop and compact induction snapshots. Simplify constant
   integer maps and induction updates on both architectures, allowing safe overlap
   for zero-scale maps while preserving source bounds and traps. Unroll ARM64 maps
   to eight vectors per branch with a vector cleanup loop, cheaper constant

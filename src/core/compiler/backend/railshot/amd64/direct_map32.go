@@ -205,7 +205,7 @@ func (e *regionLoopEmitter) broadcastMap32(id uint8, reg Reg) {
 // Group independent operations when scratch registers are available, while
 // retaining admission with the original three-register budget.
 func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
-	if count > 1 && e.fp[3] == e.fp[0] {
+	if count > 1 && (e.fp[3] == e.fp[0] || e.map32SSE2) {
 		for i := 0; i < count; i++ {
 			e.map32Vectors(1, offset+int32(i*16))
 		}
@@ -279,6 +279,8 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 			if e.map32Shift == -1 {
 				if wide {
 					f.a.YPmulld(regs[i], regs[i], e.fp[1])
+				} else if e.map32SSE2 {
+					e.map32MultiplySSE2(regs[i])
 				} else {
 					f.a.SseMapRR(0x66, 0x38, 0x40, regs[i], e.fp[1])
 				}
@@ -322,6 +324,21 @@ func (e *regionLoopEmitter) map32Vectors(count int, offset int32) {
 	}
 }
 
+// PMULUDQ produces the even lanes' 64-bit products. Repeat for shifted odd
+// lanes, then interleave the low dwords for exact modulo-2^32 multiplication.
+// The multiplier is broadcast, so the same even-lane operand serves both halves.
+func (e *regionLoopEmitter) map32MultiplySSE2(data Reg) {
+	f := e.f
+	tmp := e.fp[3]
+	f.mov128(tmp, data)
+	f.a.SseMapRRI(0x66, 0, 0x73, 2, tmp, 32)    // PSRLQ
+	f.a.SseRR(0x66, 0xf4, data, e.fp[1], false) // PMULUDQ
+	f.a.SseRR(0x66, 0xf4, tmp, e.fp[1], false)
+	f.a.Pshufd(data, data, 0x88)
+	f.a.Pshufd(tmp, tmp, 0x88)
+	f.a.SseRR(0x66, 0x62, data, tmp, false) // PUNPCKLDQ
+}
+
 func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	f, p := e.f, e.p
 	recordSources := profileEnabled && f.stats != nil && f.stats.RecordSources
@@ -347,7 +364,7 @@ func (e *regionLoopEmitter) bodyMap32(checkedTail int) {
 	if add.op == 0x92 || add.op == 0x6a {
 		e.broadcastMap32(add.right, e.fp[2])
 	}
-	if e.fp[3] != e.fp[0] {
+	if !e.map32SSE2 && e.fp[3] != e.fp[0] {
 		features := shared.AMD64AVX
 		if mul.op == 0x6c {
 			features |= shared.AMD64AVX2

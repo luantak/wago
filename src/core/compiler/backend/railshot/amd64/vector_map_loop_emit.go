@@ -55,6 +55,7 @@ type regionLoopEmitter struct {
 	mapSaved        [regionLoopMaxLocals]uint8
 	mapSavedN       int
 	map32Wide       bool
+	map32SSE2       bool
 	map32Shift      int8 // -2: zero, -1: multiply, otherwise left shift
 	fails           [64]int
 	failN           int
@@ -790,10 +791,12 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	if !inspectRegionLoop(look, f.localType, f.classifier, &p) {
 		return false, nil
 	}
+	map32SSE2 := false
 	if p.map32 {
-		if !p.qualifyMap32() || (p.nodes[p.loads[0].node].op == 0x28 && !f.cpuHas(shared.AMD64SSE41)) {
+		if !p.qualifyMap32() {
 			return false, nil
 		}
+		map32SSE2 = p.nodes[p.loads[0].node].op == 0x28 && !f.cpuHas(shared.AMD64SSE41)
 	} else if p.storeN <= 2 && p.independentLanes() {
 		if !regionLoopEnabled && !(regionWideIndependentEnabled && f.cpuHas(shared.AMD64AVX)) && !(regionZeroCounterEnabled && p.zeroTerminated) {
 			return false, nil
@@ -838,6 +841,9 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 		folded, memory = p.memoryForms(memoryForms)
 	}
 	need := 3
+	if map32SSE2 {
+		need = 4
+	} // PMULUDQ reconstruction needs one temporary.
 	if !p.map32 {
 		need = p.scratchNeedPermanent(folded, permanent)
 	}
@@ -849,7 +855,7 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	if err := f.opBlock(r, 0x03); err != nil {
 		return true, err
 	}
-	e := regionLoopEmitter{f: f, p: &p, folded: folded, memoryOperand: memory, invariantPrefix: prefix, permanent: permanent}
+	e := regionLoopEmitter{f: f, p: &p, map32SSE2: map32SSE2, folded: folded, memoryOperand: memory, invariantPrefix: prefix, permanent: permanent}
 	block := f.pinned.union(f.pinnedLocalMask).union(f.reserved)
 	n := 0
 	for _, reg := range gpAlloc {
@@ -934,7 +940,7 @@ func (f *fn) tryRegionLoop(r *wasm.Reader) (bool, error) {
 	if n < need {
 		valid = false
 	} else if p.map32 && n < allocNeed {
-		for i := 3; i < allocNeed; i++ {
+		for i := need; i < allocNeed; i++ {
 			e.fp[i] = e.fp[0]
 		}
 	}
