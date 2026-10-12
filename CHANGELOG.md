@@ -18,7 +18,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   image capacity to avoid reallocating dense large modules.
 
 - Emit guarded native SIMD for qualified scalar i32/f32 map loops on AMD64 and ARM64,
-  with the original scalar loop for fallback and tails. Reuse bounded hints
+  with the original scalar loop for fallback and tails. Unroll ARM64 maps
+  to eight vectors per branch with a vector cleanup loop. Reuse bounded hints
   to reserve code capacity without adding allocations in the measured maps.
 - Admit exact typed i64 synchronous host callbacks to the private prepared
   integer route when the bounded-work and detached-context proofs hold. Other

@@ -114,7 +114,7 @@ type regionLoopEmitter struct {
 	f     *fn
 	p     *regionLoopPlan
 	gp    [4]Reg
-	fp    [3]Reg
+	fp    [6]Reg
 	slot  int
 	fails [16]int
 	failN int
@@ -197,17 +197,12 @@ func (e *regionLoopEmitter) earlyCount() {
 }
 
 func (e *regionLoopEmitter) rangeCheck(address uint8, offset uint64, pointerSlot int) {
-	f, p := e.f, e.p
+	f := e.f
 	start, count, end, tmp := e.gp[0], e.gp[1], e.gp[2], e.gp[3]
 	e.affine(address, start, tmp)
 	f.ld32(count, SP, e.off(8))
-	f.a.SubImm64(count, count, 1)
-	stride := p.stride(address)
-	if stride != 0 {
-		f.a.MovImm64(tmp, uint64(stride))
-		f.a.Mul64(count, count, tmp)
-	}
-	f.a.AddImm64(count, count, 4)
+	// Qualification proves four-byte accesses with a four-byte stride.
+	f.a.LslImm(count, count, 2, false)
 	f.a.Add64(end, start, count)
 	f.a.MovImm64(tmp, 1<<32)
 	f.a.CmpReg64(end, tmp)
@@ -306,9 +301,82 @@ func (e *regionLoopEmitter) loadCurrentLocal(local int, dst Reg) {
 	}
 }
 
-func (e *regionLoopEmitter) body(checkedTail int) {
+func (e *regionLoopEmitter) vectors(count int, offset int32) {
+	if count > 1 && e.fp[3] == e.fp[0] {
+		// Extra registers improve scheduling but do not decide admission.
+		for i := 0; i < count; i++ {
+			e.vectors(1, offset+int32(i*16))
+		}
+		return
+	}
 	f, p := e.f, e.p
 	recordSources := profileEnabled && f.stats != nil && f.stats.RecordSources
+	var previous profileOrigin
+	regs := [4]Reg{e.fp[3], e.fp[4], e.fp[5], e.fp[0]}
+	if count == 1 {
+		regs[0] = e.fp[0]
+	}
+	add := p.nodes[p.stores[0].value]
+	mul := p.nodes[add.left]
+	if add.op == 0x94 || add.op == 0x6c {
+		mul = add
+	}
+	if recordSources {
+		f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
+		previous = f.enterProfileInstruction()
+	}
+	for i := 0; i < count; i++ {
+		f.a.LdrQ(regs[i], e.gp[1], offset+int32(i*16))
+	}
+	if recordSources {
+		f.switchProfileOrigin(previous)
+		f.wasmPC = f.tracePCBase + mul.pos
+		previous = f.enterProfileInstruction()
+	}
+	if p.nodes[p.loads[0].node].op == 0x2a {
+		for i := 0; i < count; i++ {
+			f.a.NeonFmul(regs[i], regs[i], e.fp[1], false)
+		}
+		if recordSources {
+			f.switchProfileOrigin(previous)
+			f.wasmPC = f.tracePCBase + add.pos
+			previous = f.enterProfileInstruction()
+		}
+		if add.op == 0x92 {
+			for i := 0; i < count; i++ {
+				f.a.NeonFadd(regs[i], regs[i], e.fp[2], false)
+			}
+		}
+	} else {
+		for i := 0; i < count; i++ {
+			f.a.NeonMulS(regs[i], regs[i], e.fp[1])
+		}
+		if recordSources {
+			f.switchProfileOrigin(previous)
+			f.wasmPC = f.tracePCBase + add.pos
+			previous = f.enterProfileInstruction()
+		}
+		if add.op == 0x6a {
+			for i := 0; i < count; i++ {
+				f.a.NeonAddS(regs[i], regs[i], e.fp[2])
+			}
+		}
+	}
+	if recordSources {
+		f.switchProfileOrigin(previous)
+		f.wasmPC = f.tracePCBase + p.stores[0].pos
+		previous = f.enterProfileInstruction()
+	}
+	for i := 0; i < count; i++ {
+		f.a.StrQ(e.gp[0], offset+int32(i*16), regs[i])
+	}
+	if recordSources {
+		f.switchProfileOrigin(previous)
+	}
+}
+
+func (e *regionLoopEmitter) body(checkedTail int) {
+	f, p := e.f, e.p
 	oldPC := f.wasmPC
 	add := p.nodes[p.stores[0].value]
 	mul := p.nodes[add.left]
@@ -321,60 +389,45 @@ func (e *regionLoopEmitter) body(checkedTail int) {
 	}
 	f.ld64(e.gp[0], SP, e.off(9))
 	f.ld64(e.gp[1], SP, e.off(10))
+	f.a.Add64(e.gp[0], linMemReg, e.gp[0])
+	f.a.Add64(e.gp[1], linMemReg, e.gp[1])
 	f.ld32(e.gp[2], SP, e.off(8))
 	if !f.a.AndImm32(e.gp[2], e.gp[2], ^uint32(3)) {
 		panic("arm64: map group mask is not encodable")
 	}
 	f.st64(SP, e.off(8), e.gp[2])
 	f.a.LsrImm32(e.gp[2], e.gp[2], 2)
+	// Keep up to seven vectors for the cleanup loop, so the scalar tail
+	// still contains at most three elements.
+	f.a.AndImm32(e.gp[3], e.gp[2], 7)
+	f.a.LsrImm32(e.gp[2], e.gp[2], 3)
+	f.a.CmpImm32(e.gp[2], 0)
+	noMain := f.a.Bcond(condE)
 	top := f.a.Len()
-	var previous profileOrigin
-	if recordSources {
-		f.wasmPC = f.tracePCBase + p.nodes[p.loads[0].node].pos
-		previous = f.enterProfileInstruction()
+	e.vectors(4, 0)
+	e.vectors(4, 64)
+	if profileEnabled && f.stats != nil && f.stats.RecordSources {
+		f.wasmPC = oldPC
 	}
-	f.a.LdrQIdx(e.fp[0], linMemReg, e.gp[1], 0)
-	if recordSources {
-		f.switchProfileOrigin(previous)
-		f.wasmPC = f.tracePCBase + mul.pos
-		previous = f.enterProfileInstruction()
-	}
-	if p.nodes[p.loads[0].node].op == 0x2a {
-		f.a.NeonFmul(e.fp[0], e.fp[0], e.fp[1], false)
-		if recordSources {
-			f.switchProfileOrigin(previous)
-			f.wasmPC = f.tracePCBase + add.pos
-			previous = f.enterProfileInstruction()
-		}
-		if add.op == 0x92 {
-			f.a.NeonFadd(e.fp[0], e.fp[0], e.fp[2], false)
-		}
-	} else {
-		f.a.NeonMulS(e.fp[0], e.fp[0], e.fp[1])
-		if recordSources {
-			f.switchProfileOrigin(previous)
-			f.wasmPC = f.tracePCBase + add.pos
-			previous = f.enterProfileInstruction()
-		}
-		if add.op == 0x6a {
-			f.a.NeonAddS(e.fp[0], e.fp[0], e.fp[2])
-		}
-	}
-	if recordSources {
-		f.switchProfileOrigin(previous)
-		f.wasmPC = f.tracePCBase + p.stores[0].pos
-		previous = f.enterProfileInstruction()
-	}
-	f.a.StrQIdx(linMemReg, e.gp[0], e.fp[0], 0)
-	if recordSources {
-		f.switchProfileOrigin(previous)
+	f.a.AddImm64(e.gp[0], e.gp[0], 128)
+	f.a.AddImm64(e.gp[1], e.gp[1], 128)
+	f.a.SubsImm32(e.gp[2], e.gp[2], 1)
+	more := f.a.Bcond(condNE)
+	f.patchBranch19(more, top)
+	f.patchBranch19(noMain, f.a.Len())
+	f.a.CmpImm32(e.gp[3], 0)
+	noCleanup := f.a.Bcond(condE)
+	cleanup := f.a.Len()
+	e.vectors(1, 0)
+	if profileEnabled && f.stats != nil && f.stats.RecordSources {
 		f.wasmPC = oldPC
 	}
 	f.a.AddImm64(e.gp[0], e.gp[0], 16)
 	f.a.AddImm64(e.gp[1], e.gp[1], 16)
-	f.a.SubsImm32(e.gp[2], e.gp[2], 1)
-	more := f.a.Bcond(condNE)
-	f.patchBranch19(more, top)
+	f.a.SubsImm32(e.gp[3], e.gp[3], 1)
+	more = f.a.Bcond(condNE)
+	f.patchBranch19(more, cleanup)
+	f.patchBranch19(noCleanup, f.a.Len())
 	f.a.NeonUmovS(e.gp[3], e.fp[0], 3)
 	for i, l := range p.locals[:p.localN] {
 		if !l.written {
@@ -467,8 +520,12 @@ func (f *fn) tryDirectMap32(r *wasm.Reader) (bool, error) {
 			}
 		}
 	}
-	if n != len(e.fp) {
+	if n < 3 {
 		valid = false
+	} else if n < len(e.fp) {
+		for i := 3; i < len(e.fp); i++ {
+			e.fp[i] = e.fp[0]
+		}
 	}
 	if !valid {
 		f.patchBranch26(toFast, fallback)

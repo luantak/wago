@@ -37,8 +37,8 @@ func TestDirectMap32OriginalSourcePositionsARM64(t *testing.T) {
 		}
 		for _, op := range []byte{load, mul, add, store} {
 			i := bytes.IndexByte([]byte{load, mul, add, store}, op)
-			if counts[0][i] <= counts[1][i] {
-				t.Fatalf("opcode=%x selected ranges=%d scalar ranges=%d; SIMD body needs its original source", op, counts[0][i], counts[1][i])
+			if counts[0][i] < counts[1][i]+2 {
+				t.Fatalf("opcode=%x selected ranges=%d scalar ranges=%d; unrolled and cleanup bodies need their original source", op, counts[0][i], counts[1][i])
 			}
 		}
 	}

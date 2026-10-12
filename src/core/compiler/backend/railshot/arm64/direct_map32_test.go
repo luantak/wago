@@ -97,8 +97,8 @@ func TestDirectMap32SelectionARM64(t *testing.T) {
 func TestDirectMap32SemanticsARM64(t *testing.T) {
 	for _, fp := range []bool{false, true} {
 		ref, candidate := directMap32Fixture(t, fp, true), directMap32Fixture(t, fp, false)
-		for _, n := range []uint64{0, 1, 15, 16, 17, 31, 32, 33, 513, 8192} {
-			for _, pair := range [][2]uint64{{128, 32768}, {129, 32769}, {128, 128}, {129, 128}, {128, 129}, {128, 65520}, {65520, 128}} {
+		for _, n := range []uint64{0, 1, 15, 16, 17, 20, 24, 28, 31, 32, 33, 36, 40, 44, 48, 52, 56, 60, 63, 64, 65, 127, 128, 129, 513, 8192} {
+			for _, pair := range [][2]uint64{{128, 32768}, {129, 32769}, {128, 128}, {129, 128}, {128, 129}, {128, 192}, {192, 128}, {128, 65520}, {65520, 128}} {
 				setup := func(mem []byte) {
 					for i := range mem {
 						mem[i] = 0xa5
@@ -189,7 +189,7 @@ func directMap32Countdown(t testing.TB, fp, scalar bool) *wasm.Module {
 
 func TestDirectMap32CountdownARM64(t *testing.T) {
 	for _, fp := range []bool{false, true} {
-		for _, n := range []uint64{0, 1, 15, 16, 17, 32, 33, 8192} {
+		for _, n := range []uint64{0, 1, 15, 16, 17, 20, 24, 28, 32, 33, 36, 40, 44, 48, 52, 56, 60, 63, 64, 65, 8192} {
 			setup := func(mem []byte) {
 				for i := uint64(0); i < n; i++ {
 					binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i)|0x3f800000)
@@ -306,5 +306,79 @@ func TestDirectMap32CapacityHintARM64(t *testing.T) {
 	}
 	if got := hints.map32HintCount(); got != 0 {
 		t.Fatalf("oversize body map hints=%d, want 0", got)
+	}
+}
+
+func TestDirectMap32HeapAllocationBudgetARM64(t *testing.T) {
+	if profileEnabled || regallocCheckEnabled {
+		t.Skip("production allocation budget excludes profile and register-transfer instrumentation")
+	}
+	for _, fp := range []bool{false, true} {
+		for _, countdown := range []bool{false, true} {
+			count := func(scalar bool) float64 {
+				m := directMap32Fixture(t, fp, scalar)
+				if countdown {
+					m = directMap32Countdown(t, fp, scalar)
+				}
+				return testing.AllocsPerRun(100, func() {
+					cm, err := CompileModuleWith(m, CompileOptions{Workers: 1, DeferCodeMapping: true})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if cm.CodeImage != nil {
+						cm.CodeImage.Close()
+					}
+				})
+			}
+			scalar, candidate := count(true), count(false)
+			if candidate > scalar {
+				t.Fatalf("fp=%v countdown=%v scalar=%v SIMD=%v allocations", fp, countdown, scalar, candidate)
+			}
+		}
+	}
+}
+
+func TestDirectMap32LiveFloatParametersARM64(t *testing.T) {
+	// Keep many float parameters live across the loop. Additional vector
+	// temporaries must never overwrite their homes or prevent scalar fallback.
+	for _, extra := range []int{24, 25} {
+		var result uint64
+		var memory []byte
+		for _, scalar := range []bool{true, false} {
+			m := directMap32Fixture(t, true, scalar)
+			ft, _ := m.LocalFuncType(0)
+			for i := 0; i < extra; i++ {
+				ft.Params = append(ft.Params, wasm.F32)
+			}
+			body := m.Code[0].BodyBytes
+			body = bytes.ReplaceAll(body, []byte{0x22, 6}, []byte{0x22, byte(len(ft.Params))})
+			body = bytes.ReplaceAll(body, []byte{0x20, 6}, []byte{0x20, byte(len(ft.Params))})
+			body = body[:len(body)-1]
+			for i := 6; i < len(ft.Params); i++ {
+				body = append(body, 0x20, byte(i), 0xbc, 0x73)
+			}
+			m.Code[0].BodyBytes = append(body, 0x0b)
+			if err := wasm.ValidateModule(m); err != nil {
+				t.Fatal(err)
+			}
+			args := []uint64{0, 32768, 0, 65, uint64(math.Float32bits(1.0000001)), uint64(math.Float32bits(-1))}
+			for i := 0; i < extra; i++ {
+				args = append(args, uint64(math.Float32bits(float32(i)+0.25)))
+			}
+			setup := func(mem []byte) {
+				for i := 0; i < 65; i++ {
+					binary.LittleEndian.PutUint32(mem[32768+4*i:], uint32(i)+0x3f800001)
+				}
+			}
+			got, mem, err := runMemArm64WithOptions(t, m, CompileOptions{}, setup, args...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scalar {
+				result, memory = got, mem
+			} else if got != result || !bytes.Equal(mem, memory) {
+				t.Fatalf("extra=%d changed live parameters or memory", extra)
+			}
+		}
 	}
 }
