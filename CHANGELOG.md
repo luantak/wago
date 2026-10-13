@@ -17,6 +17,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   Write AMD64 scalar abs/neg/copysign local assignments directly, avoiding result
   copies, and simplify copysign with identical inputs without altering signaling NaNs.
 
+- Reuse exception payload summaries across functions on AMD64 and ARM64 to
+  reduce compilation work for modules with many tags and `catch_all_ref` handlers.
 - Improve ARM64 execution with guarded scalar and vector loop lowering, bounded
   register reuse, borrowed operands, indexed address reuse, exact integer dot
   and absolute-difference reductions, min-plus updates, independent floating-point
