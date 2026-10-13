@@ -8,8 +8,6 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
-- Use BMI2 variable shifts only when the existing operand evaluation leaves an unrelated live RCX value to spill. Shared scalar allocation and cheap CL cases remain unchanged.
-
 - Reuse ARM64 variable-shift source and count registers in ordinary scalar
   lowering.
 
