@@ -49,6 +49,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 - Add signed/unsigned SIMD floor-average source checks, baseline benchmarks,
   and a bounded decoded corpus census.
+- Add full-vector widening-multiply source-pair tests, prepared-call benchmarks,
+  and a bounded decoded corpus census.
 - Add mixed-scalar host-call checks across nested memory, global, and table
   changes, including nested traps and repeated resolved calls.
 - Bind corpus child completion to loaded input identity and exact invocation
@@ -58,6 +60,7 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 - Read Bash completion output synchronously while preserving nested arguments,
   candidate text, and file-completion fallback for empty results.
+- Keep ARM64 i64x2 multiply lowering within five transient vector registers under pinned-local pressure.
 
 - Keep indexed memory sizes and bounds coherent across aliased imports and native
   calls on AMD64 and ARM64. Recompile native artifacts to receive the fix.
