@@ -1,46 +1,45 @@
-# Prepared semantic adapter schedules
+# Prepared semantic adapter correctness checks
 
-The Wago and wazero corpus execution benchmarks use their own prepared semantic
-adapters. The separate semantic oracle runner does not exercise these adapters.
-`TestPreparedSemanticSchedule` qualifies their scalar and vector call schedules
-with an import-free guest that records completed calls and all three arguments.
+`TestPreparedSemanticSchedule` exercises the existing prepared Wago and wazero
+adapters with a small import-free guest. The guest records completed calls and
+all three arguments in a bounded ring. Independent expected tuples check the
+adapter schedule; the separate corpus oracle runner does not exercise these
+prepared adapters.
 
-The fixture covers signed scalar arguments, explicit vector buffer offsets,
-pointer-export overrides, zero-length vectors and repeated operation on one
-instance. Input bytes are checked independently. Pointer setup has separate
-counters and must happen once. The guest stores a bounded ring of 16 argument
-tuples; tests cross its wrap boundary. After long benchmark runs, the oracle
-checks the last 16 tuples, not the entire history. The completed-call counter
-is 32 bits and is compared modulo 2^32. Normal duration-calibrated benchmark
-runs stay below that limit; extremely large fixed-count runs do not prove an
-exact total across counter wrap.
+The fixtures cover signed scalar arguments, explicit vector buffer offsets,
+pointer-export overrides, zero-length vectors, and repeated operations on one
+instance. Tests check the prepared input bytes independently. Separate counters
+require each pointer export to run once during preparation. Each fixture runs
+nine operations. The vector fixtures cross the 16-entry ring boundary.
 
-Omitted, duplicated, reordered and wrong-argument schedules run through the real
-adapters and must fail for the expected count or argument mismatch. A duplicate
-that preserves the total count ensures the count alone cannot qualify a row.
+The observer checks the completed-call count and the retained argument tuples.
+Omitted, extra, reordered, and wrong-argument schedules must fail for the
+expected count or argument mismatch. A duplicated tuple with the correct total
+count must also fail, so the work count alone cannot qualify a schedule. These
+controls use the real prepared adapters in both engines.
 
-`guest-calls/op` in existing `Exec` and `WazeroExec` rows states the prepared
-schedule length. Scalar operations contain one guest call. Semantic vector
-operations contain the complete case-set; the current BLAKE3 rows contain 35
-calls with different input lengths. Their historical `ns/op` remains per case-set.
-Do not divide that value by 35 and present it as a fixed-work call latency.
-Metadata is reported after timing; it does not add counters to ordinary calls.
-The fixture qualifies the adapter implementation, not every production call's
-dynamic outcome or the compiler/API/artifact identity of a published row.
+The completed-call counter is 32 bits and is compared modulo 2^32. After a long
+synthetic run, the observer checks the last 16 tuples rather than the entire
+history. Extremely large fixed-count runs do not prove an exact total across
+counter wrap. The checks qualify these adapter fixtures, not the compiler or
+artifact identity of published benchmark results.
 
-`BenchmarkPreparedSemanticSchedule` uses the same adapters and recording guest.
-It checks state before and after timing and reports allocation traffic per
-complete operation. Its numbers include guest recording and are synthetic.
-Compile, instantiate, input preparation, warmup, checking and close are outside
-the timer. These are repeated calls, not cold startup or first-call timings.
+`BenchmarkPreparedSemanticSchedule` is a separate synthetic diagnostic with the
+same recording guest. It checks state before and after timing. Compile,
+instantiate, input preparation, warmup, checks, and close are outside the timer.
+Guest recording is inside the timer. Standard timing and allocation units cover
+one complete fixture operation: one call for the scalar fixture or three calls
+for either vector fixture. Its `guest-calls/op` field states that fixture unit.
+This field is confined to this diagnostic; ordinary `Exec` and `WazeroExec`
+rows retain their existing output. The diagnostic does not establish production
+latency or a performance change.
 
 ```sh
-go test ./bench/suite -run '^TestPreparedSemanticSchedule'
-go test ./bench/suite -run '^$' -bench '^BenchmarkPreparedSemanticSchedule$' -benchmem
+go test ./bench/suite -run '^TestPreparedSemanticSchedule' -count=1
+go test ./bench/suite -run '^$' -bench '^BenchmarkPreparedSemanticSchedule$' \
+  -benchtime=4x -benchmem
 ```
 
-This is a bounded contribution to #826. Cache/API/compiler-path attribution,
-first-call phases and native ARM64 timing remain separate qualifications.
-The batched allocation-unit correction from merged #878 is inherited from main;
-this change adds schedule qualification and call-count metadata. Native CI
-qualifies execution correctness rather than benchmark latency.
+This is bounded correctness coverage for #826. Cache/API/compiler-path
+attribution, first-call phases, and native ARM64 timing remain separate work.
+Native CI checks execution correctness rather than benchmark latency.

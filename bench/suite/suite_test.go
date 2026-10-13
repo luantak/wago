@@ -762,7 +762,6 @@ func benchmarkExec(b *testing.B, cfg *wago.RuntimeConfig) {
 			invoke := wasmFuncInvoker(fn, args)
 			b.Run(m.name()+"."+e.Export, func(b *testing.B) {
 				benchmarkExecCalls(b, invoke)
-				b.ReportMetric(1, "guest-calls/op")
 			})
 		}
 		for _, semantic := range semanticExecCases(b, m) {
@@ -775,7 +774,6 @@ func benchmarkExec(b *testing.B, cfg *wago.RuntimeConfig) {
 			}
 			b.Run(m.name()+"."+semantic.Invoke.Export, func(b *testing.B) {
 				benchmarkExecCalls(b, prepared.invoke)
-				b.ReportMetric(float64(len(prepared.calls)), "guest-calls/op")
 			})
 		}
 		in.Close()
