@@ -8,6 +8,47 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
+- Order ordinary guest stores before the lock-free empty-notify check with
+  a full memory barrier on AMD64 and ARM64, preventing missed waiter registration.
+
+- Share validated immutable native callback wrappers across instances. Each
+  control frame retains the code; closing the last owner releases its mapping.
+
+- Hoist validated native i32 import guards for fixed shared-memory ARM64 loops,
+  keeping admitted arguments/results in registers while preserving imported
+  calls and the complete Go/foreign fallback.
+
+- Forward an immediately repeated plain i32 load from its identical store in
+  one defined fixed-size shared memory32 on ARM64. Preserve the store and its
+  bounds/trap; atomic, host-boundary and profiling cases keep their required
+  access paths. The `store-forward` optimization selection controls this lowering.
+
+- Select a guarded native body once at entry for bounded integer loops over
+  identical scalar import aliases on ARM64. Keep every original callback call,
+  the complete Go/foreign fallback, artifact admission, and optimization policies.
+
+- Reduce proven scalar host-import overhead with register arguments and cached
+  dispatch metadata on ARM64, and smaller rooted callback resume state on both
+  native backends. Fixed shared integer guests use the existing integer context
+  bridge only when the whole-module proof and binding guards hold; ARM64 direct
+  Go dispatch preserves the original callback and honors its rollback policy.
+
+- Cache stable shared-memory backing addresses on amd64 and arm64 while
+  continuing to read live atomic extents. `shared-memory-base` selects the
+  lowering independently; helper/context returns reestablish the backing cache.
+
+- Prove aligned constant atomic addresses against declared memory minimums on
+  amd64 and arm64, retaining runtime checks where the proof fails.
+  `atomic-static-bounds` selects this optimization independently.
+
+- Use single-instruction acquire/release LSE atomics for arm64 RMW and
+  compare-exchange when supported by the host. Preserve exclusive-loop fallback
+  through `atomic-lse`, and persist CPU requirements for artifact admission.
+
+- Resolve literal zero-timeout shared-memory waits in native code, preserving
+  alignment/bounds trap order and retaining the parking helper for other waits.
+  `atomic-wait-zero-timeout` selects the lowering independently per compile.
+
 - Reuse exception payload summaries across functions on AMD64 and ARM64 to
   reduce compilation work for modules with many tags and `catch_all_ref` handlers.
 - Improve ARM64 execution with guarded scalar and vector loop lowering, bounded
@@ -38,6 +79,37 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Added
 
+- Execute shared `memory.grow` on amd64 and arm64, serializing growers and
+  publishing the new extent only after guarded pages are accessible. Shared
+  accesses and size queries read the live extent across active instances;
+  constant-zero growth uses a native size query. Preserve quotas and codec reload.
+
+- Execute shared `memory.copy` and `memory.fill` on amd64 and arm64, with
+  overlap-safe copying and bounds checks before writes. Use unrolled small
+  constant operations against shared backing on both architectures.
+
+- Execute ordinary scalar and SIMD loads/stores against shared memory on
+  amd64 and arm64, preserving exact float/vector bits and explicit bounds.
+  Shared accesses use backing-directory addresses. ARM64 can forward an exact
+  adjacent plain i32 store/load pair under the fixed-memory proof; other shared
+  accesses keep their established load/store path.
+
+- Execute `memory.size` against shared-memory backing on amd64 and arm64,
+  including defined/imported memories and codec-loaded products. Admit
+  `atomic.fence` in modules without linear memory.
+
+- Execute defined shared memory with classic atomics and wait/notify, keeping
+  shared backing separate from per-instance control. Preserve backing ownership
+  across exports and producer close, and account for both native mappings.
+
+- Implement wide integer arithmetic with native amd64/arm64 carry chains and
+  signed/unsigned widening multiplies, public feature selection, and persisted
+  artifact requirements. Cover edge cases, register pressure, and trap order.
+
+- Expose compact import sections through `CoreFeatureCompactImports` and CLI
+  discovery, independently of multiple-memory admission. Enable grouped imports
+  by default without adding runtime metadata or changing native code.
+
 - Add signed/unsigned SIMD floor-average source checks, baseline benchmarks,
   and a bounded decoded corpus census.
 - Add full-vector widening-multiply source-pair tests, prepared-call benchmarks,
@@ -48,6 +120,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   evidence, with omitted-call and same-result substitution controls.
   
 ### Fixed
+
+- Preserve the invocation parent for Caller context resolution through foreign
+  native imports without publishing identity under a shared producer control
+  frame. Independent relays retain separate callback scopes and cancellation.
 
 - Read Bash completion output synchronously while preserving nested arguments,
   candidate text, and file-completion fallback for empty results.
