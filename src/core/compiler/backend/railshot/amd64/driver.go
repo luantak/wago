@@ -772,7 +772,7 @@ func (f *fn) emitPlain(r *wasm.Reader, op byte) error {
 }
 
 // emitFC dispatches the 0xFC-prefixed opcodes: saturating truncation and bulk
-// memory and wide arithmetic ops.
+// memory ops.
 func (f *fn) emitFC(r *wasm.Reader) error {
 	sub, err := r.U32()
 	if err != nil {
@@ -815,10 +815,8 @@ func (f *fn) emitFC(r *wasm.Reader) error {
 		return f.tableSize(r)
 	case 17: // table.fill
 		return f.tableFill(r)
-	case 19, 20:
-		f.wideAddSub(sub == 20)
-	case 21, 22:
-		f.wideMul(sub == 21)
+	case 19, 20, 21, 22:
+		f.wideArithmetic(sub)
 	default:
 		return fmt.Errorf("amd64: unsupported 0xFC opcode %d", sub)
 	}
