@@ -446,7 +446,11 @@ func (c *RuntimeConfig) WithOptimization(name string, enabled bool) *RuntimeConf
 	n.optimizations[name] = enabled
 	n.optimizationDeltas = c.optimizationDeltaValues()
 	n.optimizationDeltas[name] = enabled
-	n.trustedOptimizations = false
+	// The cloned selection is owned and immutable. A trusted base plus a known
+	// added name remains name-validated; an earlier unknown name must keep the
+	// ordinary Validate/Compile rejection path. Safety policy (e.g. stack-fence)
+	// is still checked by Validate independently of this name-only trust bit.
+	n.trustedOptimizations = c.trustedOptimizations && optimization.Exists(runtime.GOARCH, name)
 	return &n
 }
 
@@ -457,12 +461,14 @@ func (c *RuntimeConfig) WithOptimizations(values map[string]bool) *RuntimeConfig
 	n.optimizations = c.optimizationValues()
 	for name, enabled := range values {
 		n.optimizations[name] = enabled
+		if n.trustedOptimizations && !optimization.Exists(runtime.GOARCH, name) {
+			n.trustedOptimizations = false
+		}
 	}
 	n.optimizationDeltas = c.optimizationDeltaValues()
 	for name, enabled := range values {
 		n.optimizationDeltas[name] = enabled
 	}
-	n.trustedOptimizations = false
 	return &n
 }
 
