@@ -37,7 +37,7 @@ func (f *fn) atomicZeroWait(d railshared.Atomic) error {
 	return nil
 }
 
-// A zero notification count cannot wake a waiter, but must still check the address.
+// A zero notification count still validates the address and orders memory.
 func (f *fn) atomicZeroNotify(d railshared.Atomic) error {
 	f.materializePendingLoads()
 	f.invalidateStoreForward()
@@ -52,6 +52,8 @@ func (f *fn) atomicZeroNotify(d railshared.Atomic) error {
 	base, ea, _ := f.atomicMem(d.MemoryIndex, d.Offset, 4)
 	f.release(base)
 	f.release(ea)
+	// Preserve queue-event ordering even though no waiter can wake.
+	f.a.Mfence()
 	f.pushValue(storage{kind: stConst, typ: mtI32, cval: 0})
 	f.stats.peep("atomic-notify-empty")
 	return nil

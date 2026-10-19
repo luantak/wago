@@ -30,29 +30,22 @@ func (f *fn) emitAtomicWaitFastPath(helper uint32, slot int, offset uint32) int 
 	outOfBounds := f.a.Bcond(condA)
 	var slow int
 	if helper == railshared.AtomicHelperNotify {
-		f.ld32(X9, SP, f.spillOff(slot+1))
-		zero := f.a.Cbz32(X9)
 		f.a.SubImm64(X16, X10, abi.SharedNotifyPendingOffset)
 		// Order prior guest stores before observing wait's SC announcement.
 		// Acquire alone cannot provide the required store/load ordering.
 		f.a.DmbIsh()
 		f.a.Ldar(X9, X16, 4)
 		slow = f.a.Cbnz32(X9)
-		f.patchBranch19(zero, f.a.Len())
 		f.a.MovImm64(X9, 0)
 	} else {
 		f.a.Add64(X10, X10, X9)
 		f.a.Ldar(X9, X10, size)
 		f.ld64(X10, SP, f.spillOff(slot+1))
 		f.cmpRR(X9, X10, size == 8)
-		mismatch := f.a.Bcond(condNE)
-		f.ld64(X9, SP, f.spillOff(slot+2))
-		slow = f.a.Cbnz64(X9)
-		f.a.MovImm64(X9, 2)
-		matched := f.a.Branch()
-		f.patchBranch19(mismatch, f.a.Len())
+		// Repeat matching comparisons under the helper's queue mutex, including
+		// timeout zero, so the comparison and queue operation stay synchronized.
+		slow = f.a.Bcond(condE)
 		f.a.MovImm64(X9, 1)
-		f.patchBranch26(matched, f.a.Len())
 	}
 	f.ld64(X11, linMemReg, -int32(offCustomCtx))
 	f.st64(X11, hcResults, X9)

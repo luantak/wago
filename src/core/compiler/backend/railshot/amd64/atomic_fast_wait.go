@@ -32,9 +32,6 @@ func (f *fn) emitAtomicWaitFastPath(helper uint32, slot int, offset uint32) int 
 	f.a.Cmp64(RAX, RDI)
 	outOfBounds := f.a.JccPlaceholder(condA)
 	if helper == railshared.AtomicHelperNotify {
-		f.a.Load32(RDI, RSP, f.spillOff(slot+1))
-		f.a.TestSelf(RDI, false)
-		zero := f.a.JccPlaceholder(condE)
 		// Pair with wait's announcement before its value load. Prior guest stores
 		// must be visible before concluding that nobody can need this wake.
 		// A locked no-op on this activation's stack avoids writing the shared
@@ -44,7 +41,6 @@ func (f *fn) emitAtomicWaitFastPath(helper uint32, slot int, offset uint32) int 
 		f.a.Load32(RDI, RSI, -abi.SharedNotifyPendingOffset)
 		f.a.TestSelf(RDI, false)
 		slow := f.a.JccPlaceholder(condNE)
-		f.a.PatchRel32(zero, f.a.Len())
 		f.a.MovImm32(RAX, 0)
 		f.a.Load64(R8, RBX, -offCustomCtx)
 		f.a.Store64(R8, hcResults, RAX)
@@ -61,15 +57,10 @@ func (f *fn) emitAtomicWaitFastPath(helper uint32, slot int, offset uint32) int 
 	} else {
 		f.a.Cmp32(RAX, RDI)
 	}
-	mismatch := f.a.JccPlaceholder(condNE)
-	f.a.Load64(RAX, RSP, f.spillOff(slot+2))
-	f.a.TestSelf(RAX, true)
-	slow := f.a.JccPlaceholder(condNE)
-	f.a.MovImm32(RAX, 2)
-	matched := f.a.JmpPlaceholder()
-	f.a.PatchRel32(mismatch, f.a.Len())
+	// A matching wait must synchronize its comparison with the queue operation,
+	// even for timeout zero. Let the helper repeat it under the queue mutex.
+	slow := f.a.JccPlaceholder(condE)
 	f.a.MovImm32(RAX, 1)
-	f.a.PatchRel32(matched, f.a.Len())
 	f.a.Load64(R8, RBX, -offCustomCtx)
 	f.a.Store64(R8, hcResults, RAX)
 	done := f.a.JmpPlaceholder()
