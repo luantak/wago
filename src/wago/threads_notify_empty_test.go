@@ -289,8 +289,9 @@ func TestThreadsNotifyPlainStoreOrdering(t *testing.T) {
 	switch goruntime.GOARCH {
 	case "amd64":
 		a := &x64.Asm{}
-		a.Mfence()
-		a.Load32(x64.RCX, x64.RDX, -abi.SharedNotifyPendingOffset)
+		a.MovImm32(x64.RAX, 0)
+		a.LockAluIdx(0x09, x64.RSP, x64.RAX, x64.RAX, 0, 4)
+		a.Load32(x64.RDI, x64.RSI, -abi.SharedNotifyPendingOffset)
 		orderedCheck = a.B
 	case "arm64":
 		a := &a64.Asm{}
