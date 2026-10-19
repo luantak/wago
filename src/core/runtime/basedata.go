@@ -194,6 +194,8 @@ const jobMemoryReclaimThreshold = 384 << 10
 // platform's zero-reclamation operation or its correctness-preserving explicit
 // clear fallback (mirrors the guard-page path's decommitGuarded, minus the
 // PROT_NONE re-arm — explicit bounds never fault, so the mapping stays RW).
+// An opt-in platform policy may clear a bounded sparse resident working set
+// instead, retaining no more backing than the small-range clear policy.
 func (j *JobMemory) reclaimForReuse() error {
 	used := roundUpPage(basedataSize + j.curBytes())
 	if used > len(j.mem) {
@@ -201,6 +203,9 @@ func (j *JobMemory) reclaimForReuse() error {
 	}
 	if used <= jobMemoryReclaimThreshold {
 		clear(j.mem[:used])
+		return nil
+	}
+	if sparseJobMemoryReuseEnabled && sparseJobMemoryReclaim != nil && sparseJobMemoryReclaim(j.mem[:used]) {
 		return nil
 	}
 	return madviseDontNeed(j.mem[:used])
