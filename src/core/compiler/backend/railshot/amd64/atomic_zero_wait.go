@@ -36,3 +36,23 @@ func (f *fn) atomicZeroWait(d railshared.Atomic) error {
 	f.stats.peep("atomic-wait-zero-timeout")
 	return nil
 }
+
+// A zero notification count cannot wake a waiter, but must still check the address.
+func (f *fn) atomicZeroNotify(d railshared.Atomic) error {
+	f.materializePendingLoads()
+	f.invalidateStoreForward()
+	f.dropValue()
+	address, _ := f.materializeRead(f.s.back())
+	align := f.allocReg(maskOf(address))
+	f.a.MovRegReg32(align, address)
+	f.a.AluRI(0, align, int32(uint32(d.Offset)), false)
+	f.a.TestImm(align, 3, false)
+	f.trapIf(condNE, trapAtomicUnaligned)
+	f.release(align)
+	base, ea, _ := f.atomicMem(d.MemoryIndex, d.Offset, 4)
+	f.release(base)
+	f.release(ea)
+	f.pushValue(storage{kind: stConst, typ: mtI32, cval: 0})
+	f.stats.peep("atomic-notify-empty")
+	return nil
+}

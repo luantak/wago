@@ -1300,6 +1300,16 @@ func (f *fn) callHostSync(importIdx int, ft *wasm.CompType) error {
 	}
 	f.tmpTypes = types
 	f.tmpStackSlots = slotOf
+	// Only memory32 index zero has this compact canonical-slot fast path.
+	// Other memories retain their existing width-aware helper lowering.
+	atomicFast := f.threadedMemory0 && !f.memoryAddr64(0) &&
+		(atomicWait && p == 4 || notifyFast && p == 3)
+	atomicOffset := uint32(0)
+	if atomicFast {
+		offset := roots[d-1].st
+		atomicFast = offset.kind == stConst && uint64(offset.cval) <= 0xffffffff
+		atomicOffset = uint32(offset.cval)
+	}
 	belowTypes := f.tmpTypes2[:0]
 	if cap(belowTypes) < d-p {
 		belowTypes = make([]machineType, 0, d-p)
@@ -1321,6 +1331,19 @@ func (f *fn) callHostSync(importIdx int, ft *wasm.CompType) error {
 		// helpers cannot; their module-pinned registers are callee-saved across the
 		// parked transition, so avoid a redundant cell round trip at every GC op.
 		f.storeModuleGlobals(RAX)
+	}
+
+	atomicDone := -1
+	if atomicFast {
+		f.materializeGCFrameRootLocalsForCall(importIdx)
+		f.spillLocalsForCall()
+		if regallocCheckEnabled {
+			f.checkCallClobber()
+		}
+		atomicDone = f.emitAtomicWaitFastPath(uint32(importIdx)&^shared.AtomicWaitDispatchBit, int(slotOf[d-p]), atomicOffset)
+		if notifyFast {
+			f.stats.peep("atomic-notify-empty")
+		}
 	}
 
 	// Marshal params into the control frame as wrapper-ABI slots. A v128 occupies
@@ -1358,8 +1381,10 @@ func (f *fn) callHostSync(importIdx int, ft *wasm.CompType) error {
 	// registers are caller-saved. Exact GC frame-root publication also requires
 	// lazy-zero reference locals to have concrete frame slots before RSP is
 	// published. Then store every dirty pinned local and mark it for lazy reload.
-	f.materializeGCFrameRootLocalsForCall(importIdx)
-	f.spillLocalsForCall()
+	if !atomicFast {
+		f.materializeGCFrameRootLocalsForCall(importIdx)
+		f.spillLocalsForCall()
+	}
 	nativeAllocDone := -1
 	if nativeStructType != 0 {
 		typeIndex := nativeStructType - 1
@@ -1393,7 +1418,7 @@ func (f *fn) callHostSync(importIdx int, ft *wasm.CompType) error {
 	f.a.StoreImm32Mem(R8, hcNArgs, int32(paramSlots|resultSlots<<16))
 
 	notifyDone := -1
-	if notifyFast {
+	if notifyFast && !atomicFast {
 		notifyDone = f.notifyEmptyShortcut(notifyIndex)
 	}
 	// Park at the host call. Like the wrapper path, no post-call trap check: a
@@ -1410,6 +1435,9 @@ func (f *fn) callHostSync(importIdx int, ft *wasm.CompType) error {
 	}
 	if nativeAllocDone >= 0 {
 		f.a.PatchRel32(nativeAllocDone, f.a.Len())
+	}
+	if atomicDone >= 0 {
+		f.a.PatchRel32(atomicDone, f.a.Len())
 	}
 	f.reloadLocalsForCall() // old model: restore caller-saved R9..R11 local pins
 
