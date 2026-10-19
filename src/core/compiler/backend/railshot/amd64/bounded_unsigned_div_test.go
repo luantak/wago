@@ -29,11 +29,100 @@ func TestBoundedUnsignedReciprocalProof(t *testing.T) {
 	}
 }
 
+func TestBoundedUnsignedDivRangeExpression(t *testing.T) {
+	requireCompilerDiagnostics(t)
+	saved := sharedScalarEnabled
+	sharedScalarEnabled = false
+	defer func() { sharedScalarEnabled = saved }()
+	// The unsigned shift proves a small dividend without an immediate AND.
+	// Keep the original input live after the quotient/remainder is computed.
+	for _, rem := range []bool{false, true} {
+		op := byte(0x6e)
+		if rem {
+			op = 0x70
+		}
+		body := []byte{0, 0x20, 0, 0x41, 16, 0x76, 0x41, 7, op, 0x20, 0, 0x73, 0x0b}
+		m := mod1(t, []wasm.ValType{wasm.I32}, []wasm.ValType{wasm.I32}, body)
+		var stats ModuleStats
+		cm, err := CompileModuleWith(m, CompileOptions{Stats: &stats})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer cm.CodeImage.Close()
+		if stats.Funcs[0].Peephole["bounded-unsigned-div"] == 0 {
+			t.Errorf("rem=%v lost unsigned-shift range", rem)
+		}
+		for _, input := range []uint64{0, 1, 65536, 0x7fffffff, 0xffffffff, 0xfedcba9876543210} {
+			n := uint32(input)
+			want := (n >> 16) / 7
+			if rem {
+				want = (n >> 16) % 7
+			}
+			if got := runCompiledAmd64u(t, cm, input); uint32(got) != want^n {
+				t.Fatalf("rem=%v input=%x got=%x want=%x", rem, input, got, want^n)
+			}
+		}
+	}
+}
+
+func TestBoundedUnsignedDivLocalRangeInvalidation(t *testing.T) {
+	requireCompilerDiagnostics(t)
+	saved := sharedScalarEnabled
+	sharedScalarEnabled = false
+	defer func() { sharedScalarEnabled = saved }()
+	for _, mutation := range []string{"none", "overwrite", "join", "wrap"} {
+		for _, rem := range []bool{false, true} {
+			body := []byte{0, 0x20, 0, 0x41, 0xff, 0x01, 0x71, 0x21, 1, 0x01}
+			switch mutation {
+			case "overwrite":
+				body = append(body, 0x20, 0, 0x21, 1)
+			case "join":
+				body = append(body, 0x20, 2, 0x04, 0x40, 0x20, 0, 0x21, 1, 0x0b)
+			case "wrap":
+				body = append(body, 0x20, 1, 0x41, 0x80, 0x7c, 0x6a, 0x21, 1)
+			}
+			op := byte(0x6e)
+			if rem {
+				op = 0x70
+			}
+			body = append(body, 0x01, 0x20, 1, 0x41, 7, op, 0x0b)
+			m := modMem(t, 1, []wasm.ValType{wasm.I32, wasm.I32, wasm.I32}, []wasm.ValType{wasm.I32}, body)
+			var stats ModuleStats
+			cm, err := CompileModuleWith(m, CompileOptions{Stats: &stats})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cm.CodeImage.Close()
+			if (stats.Funcs[0].Peephole["bounded-unsigned-div"] != 0) != (mutation == "none") {
+				t.Fatalf("mutation=%s rem=%v invalid range selection: %v", mutation, rem, stats.Funcs[0].Peephole)
+			}
+			for _, input := range []uint64{0, 255, 65536, 0xffffffff, 0xfedcba9876543210} {
+				for _, condition := range []uint64{0, 1} {
+					n := uint32(input) & 255
+					if mutation == "overwrite" || mutation == "join" && condition != 0 {
+						n = uint32(input)
+					} else if mutation == "wrap" {
+						n -= 512
+					}
+					want := n / 7
+					if rem {
+						want = n % 7
+					}
+					got, _, err := runMemAmd64WithOptions(t, m, CompileOptions{}, nil, input, 0, condition)
+					if err != nil || got != uint64(want) {
+						t.Fatalf("mutation=%s rem=%v input=%x condition=%d got=%d want=%d err=%v", mutation, rem, input, condition, got, want, err)
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestBoundedUnsignedDivNative(t *testing.T) {
 	saved := boundedUnsignedDivEnabled
 	defer func() { boundedUnsignedDivEnabled = saved }()
 	for _, mask := range []uint32{255, 65535, 0x800000ff} {
-		for _, d := range []uint32{3, 7, 31, 65537} {
+		for _, d := range []uint32{3, 5, 7, 9, 31, 65537} {
 			for _, rem := range []bool{false, true} {
 				op := byte(0x6e)
 				if rem {

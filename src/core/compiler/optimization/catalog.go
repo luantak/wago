@@ -68,8 +68,10 @@ type Snapshot struct {
 // lifetime.
 type Selection struct {
 	bindings *Bindings
-	bits     [2]uint64
+	bits     [selectionWords]uint64
 }
+
+const selectionWords = 4
 
 // Option is a pre-resolved flag owned by one architecture's Bindings. Backends
 // resolve these once during package initialization so hot lowering decisions
@@ -213,10 +215,10 @@ func (b *Bindings) CurrentSnapshot() Snapshot {
 func (b *Bindings) ResolveSnapshot(overrides map[string]bool, _ Snapshot, _ map[string]bool) (Selection, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if len(b.entries) > 128 {
-		return Selection{}, fmt.Errorf("%s optimization catalog has %d entries, maximum is 128", b.arch, len(b.entries))
+	if len(b.entries) > selectionWords*64 {
+		return Selection{}, fmt.Errorf("%s optimization catalog has %d entries, maximum is %d", b.arch, len(b.entries), selectionWords*64)
 	}
-	var bits [2]uint64
+	var bits [selectionWords]uint64
 	matched := 0
 	for index, entry := range b.entries {
 		on := *entry.value
@@ -397,6 +399,8 @@ var (
 )
 
 var catalog = []Definition{
+	experimentalAMD64("loop-invariant-store", "Guarded invariant loop stores", "version total integer loops with range and nonalias guards before sinking invariant-destination stores"),
+	experimentalAMD64("loop-invariant-store-unroll", "Guarded integer prefix unrolling", "peel and unroll proven store-free integer loop prefixes in bounded groups"),
 	both("bounds-facts", "Bounds facts", "straight-line bounds-check elision"),
 	both("simd-superopt", "SIMD superoptimization", "recognize bounded multi-operation SIMD sequences"),
 	amd64("simd-reduction-borrow", "Read-only vector reductions", "read pinned vector inputs without copying them for bitmasks and any-true reductions"),
@@ -444,6 +448,25 @@ var catalog = []Definition{
 	amd64("tree-order", "Valent tree ordering", "schedule bounded commutative trees by register need"),
 	amd64("assoc-tree", "Associative tree cover", "cover high-pressure bounded associative trees with one accumulator"),
 	experimentalAMD64("bmi2-rorx", "BMI2 rotates", "use non-destructive immediate rotates on BMI2 hosts"),
+	experimentalAMD64("pure-loop-vector", "Pure integer reduction vectorization", "vectorize proven independent integer reduction DAGs with exact scalar tails"),
+	experimentalAMD64("select-pure-guard", "Pure select work guarding", "skip expensive nontrapping integer select work when its alternative is selected"),
+	experimentalAMD64("masked-truth", "Masked select predicates", "test masked integer select predicates without materializing their value"),
+	experimentalAMD64("boolean-chain", "Pure boolean comparison chains", "short circuit canonical boolean chains with already evaluated integer operands"),
+	experimentalAMD64("integer-region-vector", "Integer vector region boundaries", "allow proven call-free integer loops at inactive regional cache boundaries"),
+	experimentalAMD64("byte-bounds-direct", "Direct byte bounds comparisons", "compare zero-offset byte addresses directly against the memory size"),
+	experimentalAMD64("linear-integer-collect", "Collect repeated integer terms", "combine pure repeated local terms in bounded wrapping i32 expressions"),
+	experimentalAMD64("bmi1-andnot", "BMI1 inverted conjunction", "combine scalar inversion and conjunction using feature-gated ANDN"),
+	experimentalAMD64("boolean-chain-operands", "Boolean chain operand folding", "fold private frame and immediate operands into integer chain comparisons"),
+	experimentalAMD64("bmi2-shift", "BMI2 variable shifts", "use feature-gated three-register integer shifts without a fixed count register"),
+	experimentalAMD64("integer-memory-vector", "Integer memory reduction vectorization", "guard affine load streams and vectorize independent integer reduction DAGs"),
+	experimentalAMD64("integer-counted-vector", "Counted integer reduction vectorization", "vectorize independent modular induction variables and integer predicate DAGs"),
+	experimentalAMD64("integer-paired-loads", "Shared interleaved vector loads", "load adjacent interleaved integer streams together after range and equality guards"),
+	experimentalAMD64("integer-store-vector", "Independent integer store vectorization", "vectorize independent integer maps after full-range and nonaliasing store guards"),
+	experimentalAMD64("integer-map-vector", "Independent integer load-store vectorization", "vectorize integer maps after guarding full load/store ranges and disjointness"),
+	experimentalAMD64("integer-map-group-guard", "Grouped integer map overlap guards", "check proven contiguous stream groups for whole-range load/store disjointness"),
+	experimentalAMD64("weighted-loop-pin-exchange", "Weighted loop pin exchange", "lend low-use integer pins to more frequently used loop locals"),
+	experimentalAMD64("avoid-sink-spill", "Avoid destination-induced spill", "compute pure self-assignments in scratch storage when destination sinking would spill a live operand"),
+	experimentalAMD64("extended-loop-pin-scan", "Extended loop pin scan", "consider larger straight-line loops for inactive register pin exchanges"),
 	amd64("avx512-ternary", "AVX-512 ternary SIMD", "fuse adjacent 128-bit vector boolean operations on AVX-512VL hosts"),
 	amd64("avx512-vrotate", "AVX-512 vector rotates", "select packed rotate instructions for exact i32x4 rotate idioms on AVX-512VL hosts"),
 	amd64("callfree-loop-reg-state", "Call-free loop register state", "keep written pinned locals register-resident across simple call-free loop backedges"),
@@ -474,7 +497,7 @@ var catalog = []Definition{
 	amd64("interval-r8-lease", "Regional R8 leasing", "lend R8 to signal-bounded straight-line integer regions after excluding fixed-register lowerings"),
 	amd64("interval-i64-weight", "Regional i64 weighting", "price packed 64-bit local reloads more heavily in regional eviction"),
 	both("interval-next-use", "Regional next-use eviction", "use a compact local-event tape to evict the farthest local version and elide dead stores"),
-	amd64("memsize-regional-lease", "Regional memory-size leasing", "lend the memory-size register to proved straight-line local regions"),
+	amd64("memsize-regional-lease", "Regional memory-size leasing", "lend the memory-size register to proved straight-line regions and memory-free leaf loops"),
 	amd64("module-global-regional-lease", "Regional module-global leasing", "lend an unreferenced module-global register to proved straight-line local regions"),
 	{Name: "loop-memory-base", Label: "Loop memory page bases", Description: "hoist repeated linear-memory page bases into idle loop-constant registers", Default: true, Architectures: catalogARM64Architectures},
 	arm64("loop-int-const", "Loop integer constants", "keep costly loop-invariant integer constants in otherwise-idle registers"),
@@ -529,8 +552,56 @@ var catalog = []Definition{
 	both("v128-pins", "Vector pins", "pin hot vector locals in registers"),
 	both("reg-abi", "Register ABI", "use Wago's internal register calling convention"),
 	both("inline", "Inlining", "inline eligible callees"),
+	amd64("inline-parameter-pins", "Inline parameter pins", "use spare local pin registers for inlined integer parameters"),
+	amd64("inline-leaf-wrapper", "Inline leaf wrapper", "inline bounded integer wrappers around leaf functions"),
+	amd64("cheap-select-guard", "Cheap select guard", "guard optional inexpensive pure integer arithmetic"),
+	amd64("short-select-guard", "Short select guard", "use short branches over bounded scalar select arithmetic"),
+	amd64("immediate-remainder", "Immediate remainder multiply", "reuse dead quotient registers for immediate remainder reconstruction"),
+	amd64("pressure-compact", "Compact register expressions", "finish pure owned-register expressions before memory access under pressure"),
+	amd64("wrapped-load-group", "Wrapped load groups", "group straight-line load bounds checks with a modular interval proof"),
+	amd64("zero-store-pair", "Adjacent zero stores", "merge 32-byte descending zero-store runs in loops under the first bounds check"),
+	amd64("memory-update", "Constant memory updates", "fold a checked full-width load and constant integer operation into a same-address store"),
+	amd64("select-frame", "Frame alternative select", "fold a numeric frame-backed select alternative into CMOV"),
+	amd64("avoid-regional-sink-spill", "Avoid regional destination spills", "apply free-register-budget destination spill avoidance inside regional-cache functions"),
+	amd64("signed-load-group", "Signed arithmetic load groups", "extend modular bounds proofs to negative constant address additions"),
+	amd64("select-local-sink", "Local select destination", "conditionally update a pinned false-arm local without copying the selected result"),
+	amd64("select-flags-sink", "Flags select destination", "conditionally update a select destination using the comparison flags"),
+	amd64("scaled-jump-table", "Scaled jump-table loads", "fold the dispatch index scale into the signed table load"),
+	amd64("lea-double", "Borrowed integer doubling", "double a borrowed integer with one nondestructive LEA"),
+	amd64("comparison-accumulate", "Comparison arithmetic", "consume unsigned comparison carry directly in integer addition or subtraction"),
+	amd64("short-select-mul", "Short multiply guards", "use a footprint-preserving short branch around a single pure multiply"),
+	experimentalAMD64("bulk-ready-args", "Ready bulk memory arguments", "marshal ready memory-copy arguments directly into fixed registers"),
+	experimentalAMD64("forward-byte-copy", "Affine forward byte-copy loops", "version affine forward-copy loops with complete range proofs and checked scalar fallback"),
+	experimentalAMD64("structured-loop-range", "Structured induction ranges", "prove nonwrapping induction ranges through balanced conditional loop bodies"),
+	experimentalAMD64("integer-packet-vector", "Integer expression packets", "pack isomorphic integer expression lanes over contiguous guarded load streams"),
+	experimentalAMD64("integer-packet-program", "Extended integer packets", "pack lane-varying inputs and preserve total scalar post-processing of integer reductions"),
+	experimentalAMD64("integer-packet-input-hoist", "Invariant packet inputs", "materialize immutable lane-varying inputs outside packet loops using free vector registers"),
+	experimentalAMD64("simd-literal-operand", "Direct SIMD literal operands", "read adjacent integer vector literals directly from cached registers or the literal pool"),
+	experimentalAMD64("recursive-inline-budget", "Bounded recursive inlining", "admit small pure recursive callees across modules and nonoverlapping inline banks under fixed depth and expansion budgets"),
+	experimentalAMD64("conditional-memory-store", "Conditional memory stores", "reuse explicit checked loads for conditional stores to the same unshared address"),
+	experimentalAMD64("deferred-mem-left", "Deferred memory operand selection", "fold commutative memory operands after computing safe deferred right operands"),
+	experimentalAMD64("owned-pinned-tee", "Owned pinned tee values", "retain independent owned integer values when assigning a pinned local"),
+	experimentalAMD64("branch-address-maximum", "Branch-proven address maximum", "retain direct unsigned local upper bounds on conditional branch fallthrough"),
+	amd64("boolean-chain-depth", "Long boolean reductions", "retain bounded flat boolean chains for fixed-scratch lowering"),
+	amd64("integer-select-group", "Masked update groups", "skip pure update groups when their combined controlling mask is zero"),
+	amd64("bounded-remainder-lea", "Bounded remainder product", "use scaled LEA for supported bounded remainder divisors"),
+	amd64("byte-store-run", "Adjacent byte stores", "pack descending byte stores into a checked word store"),
+	amd64("byte-store-movzx", "Byte packing reads", "combine byte packing copies and masks into zero-extending moves"),
+	amd64("canonical-rounddown", "Canonical reciprocal input", "reuse proven zero-extended dividends for round-down reciprocal division"),
+	amd64("wide-call-pin-budget", "Wide caller pin budget", "use up to four integer local pins in bounded wide calling functions"),
+	amd64("local-root-realize", "Realize local expression roots", "finish pure expressions with repeated local reads before overwriting the local"),
+	amd64("local-root-pressure", "Realize register-heavy local roots", "finish pure expressions holding multiple registers before a local overwrite"),
+	amd64("rounddown-div", "Rounded-down reciprocal", "use proven rounded-down reciprocal sequences for unsigned i32 constant division"),
+	amd64("wide-unsigned-mul-high", "Wide unsigned multiply high", "compute unsigned i32 high products using ordinary 64-bit register multiplication"),
+	amd64("local-spill-reuse", "Local spill reuse", "reuse valid local frame copies during register pressure"),
 	both("stack-fence", "Stack fence", "emit the stack-overflow guard fence"),
 	both("stack-reg", "Stack register", "keep the guest stack pointer in a register"),
+	experimentalAMD64("literal-pool-align", "Vector literal pool alignment", "naturally align vector-bearing function-local pools in SIMD modules while preserving scalar-only layouts"),
+	experimentalAMD64("nested-loop-range", "Nested loop address ranges", "preserve bounded monotone induction proofs through balanced nested control without moving memory operations"),
+	experimentalAMD64("select-compare-pair", "Selected comparison flags", "share one integer comparison across selected predicates of the same unchanged values"),
+	experimentalAMD64("pure-countdown-unroll", "Pure countdown loop unrolling", "repeat bounded total integer countdown-loop bodies in a guarded prefix while preserving an original scalar tail"),
+	experimentalAMD64("bmi1-reset-lowest-bit", "BMI1 lowest-bit reset", "lower a pure same-local lowest-set-bit reset expression with BLSR when BMI1 is available"),
+	experimentalAMD64("unsigned-remainder-range", "Unsigned remainder ranges", "propagate unsigned constant remainder bounds through expression trees and current-region locals"),
 }
 
 func both(name, label, description string) Definition {

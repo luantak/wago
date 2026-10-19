@@ -2706,7 +2706,10 @@ func (f *fn) emitFD(r *wasm.Reader) error {
 			}
 			b[i] = v
 		}
-		f.v128Const(binary.LittleEndian.Uint64(b[0:8]), binary.LittleEndian.Uint64(b[8:16]))
+		lo, hi := binary.LittleEndian.Uint64(b[0:8]), binary.LittleEndian.Uint64(b[8:16])
+		if !f.trySIMDLiteralOperand(r, lo, hi) {
+			f.v128Const(lo, hi)
+		}
 	case 13: // i8x16.shuffle
 		var lanes [16]byte
 		for i := range lanes {

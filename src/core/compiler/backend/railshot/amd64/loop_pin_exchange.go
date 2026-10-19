@@ -9,11 +9,14 @@ import (
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 )
 
-// A small straight-line loop may borrow an inactive function pin. Its previous
-// value is homed before the loop and restored on the loop's only exit. Keep the
+// A small straight-line loop may borrow an inactive function pin (or, under
+// the experimental weighted policy, a less-used pin). Its value is homed
+// before the loop and the current home restored on the loop's only exit. Keep the
 // default on the platform with native correctness and performance qualification.
 // WAGO_AMD64_NO_LOOP_PIN_EXCHANGE=1 is the rollback switch.
 var loopPinExchangeEnabled = runtime.GOOS == "linux" && os.Getenv("WAGO_AMD64_NO_LOOP_PIN_EXCHANGE") != "1"
+var extendedLoopPinScanEnabled = os.Getenv("WAGO_AMD64_EXTENDED_LOOP_PIN_SCAN") == "1"
+var weightedLoopPinExchangeEnabled = os.Getenv("WAGO_AMD64_WEIGHTED_LOOP_PIN_EXCHANGE") == "1"
 
 const loopPinBits = 17
 
@@ -32,7 +35,11 @@ func (f *fn) planLoopPinExchange(r *wasm.Reader) (uint64, uint64) {
 	var imm wasm.InstructionImmediate
 	backedge := false
 	closed := false
-	for step := 0; step < 96 && look.Offset()-start <= 512; step++ {
+	instructionLimit, byteLimit := 96, 512
+	if f.opt(optExtendedLoopPinScan) {
+		instructionLimit, byteLimit = 256, 2048
+	}
+	for step := 0; step < instructionLimit && look.Offset()-start <= byteLimit; step++ {
 		op, err := look.Byte()
 		if err != nil || f.classifier.ClassifyInto(&look, op, &imm) != nil {
 			return 0, 0
@@ -77,7 +84,7 @@ func (f *fn) planLoopPinExchange(r *wasm.Reader) (uint64, uint64) {
 	for count := 0; count < 2; count++ {
 		bestNew, bestScore := -1, 0
 		for x := 0; x < f.nLocals; x++ {
-			if selected&(uint64(1)<<x) != 0 || f.locals[x].reg != regNone || f.localType[x] != mtI32 || f.locals[x].state != lsMem {
+			if selected&(uint64(1)<<x) != 0 || f.locals[x].reg != regNone || (f.localType[x] != mtI32 && f.localType[x] != mtI64) || f.locals[x].state != lsMem {
 				continue
 			}
 			score := int(reads[x])*2 + int(writes[x])
@@ -88,13 +95,23 @@ func (f *fn) planLoopPinExchange(r *wasm.Reader) (uint64, uint64) {
 		if bestScore < 6 {
 			break
 		}
-		bestOld := -1
+		bestOld, oldScore := -1, 1<<30
 		for _, x := range f.pinnedLocals {
-			if selected&(uint64(1)<<x) != 0 || f.localType[x] != mtI32 || reads[x] != 0 || writes[x] != 0 || f.locals[x].state == lsConstZero {
+			// Both integer widths use the same GP register bank. Transfers
+			// preserve each local's own width, including mixed-width leases.
+			if selected&(uint64(1)<<x) != 0 || (f.localType[x] != mtI32 && f.localType[x] != mtI64) || f.locals[x].state == lsConstZero {
 				continue
 			}
-			bestOld = x
-			break
+			score := int(reads[x])*2 + int(writes[x])
+			if score != 0 && !f.opt(optWeightedLoopPinExchange) {
+				continue
+			}
+			// Require a substantial net transfer reduction. The donor remains
+			// a normal frame local during the loop; its exit value is reloaded
+			// by restoreLoopPinExchange even when the loop writes it.
+			if score < oldScore && bestScore-score >= 6 {
+				bestOld, oldScore = x, score
+			}
 		}
 		if bestOld == -1 {
 			break

@@ -166,6 +166,9 @@ func (f *fn) flushBelow(node *elem) int {
 // the branch, so callers flush everything below first.
 func (f *fn) condenseToFlags(node *elem) Cond {
 	f.stats.peep("cmp-branch-fuse")
+	if f.isMaskedTruth(node) {
+		return f.maskedTruthToFlags(node)
+	}
 	// eqz over a fusable compare fuses by INVERTING the branch condition rather than
 	// materializing the inner boolean (the SETcc+MOVZX+TEST an `eqz(a<b)` otherwise
 	// costs): `eqz(a<b)` branches on !(a<b) directly. Nested eqz peels too

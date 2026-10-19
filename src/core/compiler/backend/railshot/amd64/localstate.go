@@ -136,6 +136,7 @@ func (f *fn) storeFrameVector(off int32, src Reg) {
 }
 
 func (f *fn) markDeclaredLocalZero(x int) {
+	f.forgetLocalSpillCopies(x)
 	f.locals[x].state = lsConstZero
 }
 
@@ -224,6 +225,8 @@ func (f *fn) recoverLocal(x int) {
 
 // markLocalDirty records that pinned local x was just written (value only in reg).
 func (f *fn) markLocalDirty(x int) {
+	f.forgetLocalSpillCopies(x)
+	f.forgetAddressMaximum(uint32(x))
 	if f.usesCalls || f.lazyZero || f.pinRelinquished || len(f.intervalReg) != 0 || f.locals[x].state == lsMem {
 		f.locals[x].state = lsReg
 	}

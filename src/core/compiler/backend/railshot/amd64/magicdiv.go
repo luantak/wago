@@ -2,7 +2,13 @@
 
 package amd64
 
-import "github.com/wago-org/wago/src/core/compiler/backend/railshot"
+import (
+	"github.com/wago-org/wago/src/core/compiler/backend/railshot"
+	"os"
+)
+
+var wideUnsignedMulHighEnabled = os.Getenv("WAGO_AMD64_WIDE_UNSIGNED_MUL_HIGH") == "1"
+var immediateRemainderEnabled = os.Getenv("WAGO_AMD64_IMMEDIATE_REMAINDER") == "1"
 
 // Constant-divisor strength reduction. A div/rem by a constant is replaced with
 // cheap shifts (power-of-2 divisors) or a multiply-high + shift (the Granlund–
@@ -32,7 +38,7 @@ func (f *fn) tryDivByConst(node *elem, dest Reg, c int64) (Reg, bool) {
 	var shift byte
 	bounded := false
 	if boundedUnsignedDivEnabled && !w && !signed {
-		if b, ok := boundedUnsignedDividend(node.arg0); ok {
+		if b, ok := f.boundedUnsignedDividend(node.arg0); ok {
 			bound = b
 			mult, shift, bounded = boundedUnsignedReciprocal(bound, uint32(c))
 		}
@@ -41,9 +47,22 @@ func (f *fn) tryDivByConst(node *elem, dest Reg, c int64) (Reg, bool) {
 	// original destination exclusions even when the final operation is bounded.
 	res := f.allocReg(maskOf(RAX, RDX))
 	f.pinned = f.pinned.add(res)
+	canonical := !w && !signed && !bounded && f.canonicalRounddownInput(node.arg0)
 	f.condenseInto(node.arg0, res) // res = n (dividend)
 
-	if bounded {
+	reduced := false
+	if canonical {
+		ud := uint64(uint32(c))
+		if ud >= 3 && ud&(ud-1) != 0 {
+			_, _, add := railshot.MagicU(ud, 32)
+			if add {
+				reduced = f.tryRounddownDiv(res, ud, wantRem, true)
+			}
+		}
+	}
+	if reduced {
+		// The canonical round-down lowering completed the operation.
+	} else if bounded {
 		f.divConstUnsignedBounded(res, uint32(c), bound, mult, shift, wantRem)
 	} else if signed {
 		f.divConstSigned(res, c, w, wantRem)
@@ -224,7 +243,10 @@ func (f *fn) divConstUnsignedMagic(res Reg, d uint64, w, wantRem bool) {
 		W = 64
 	}
 	magic, shift, add := railshot.MagicU(d, W)
-	q := f.magicMulHigh(res, magic, w, false) // q = high(res * magic), pinned
+	if !w && add && f.tryRounddownDiv(res, d, wantRem) {
+		return
+	}
+	q := f.magicMulHigh(res, magic, w, false, add) // q = high(res * magic), pinned
 	if add {
 		// q = ((n - q) >> 1) + q  (an overflow-free way to add n before the shift).
 		t := f.allocReg(maskOf(res, q))
@@ -240,7 +262,7 @@ func (f *fn) divConstUnsignedMagic(res Reg, d uint64, w, wantRem bool) {
 		f.a.ShiftImm(5, q, byte(shift), w) // q >>= shift (logical)
 	}
 	if wantRem {
-		f.remFromQuot(res, q, int64(d), w) // res = n - q*d
+		f.remFromQuot(res, q, int64(d), w, false) // res = n - q*d
 	} else {
 		f.a.MovReg64(res, q)
 	}
@@ -260,7 +282,7 @@ func (f *fn) divConstSignedMagic(res Reg, d int64, w, wantRem bool) {
 		ad = uint64(-d)
 	}
 	magic, shift, addN := railshot.MagicS(ad, W)
-	q := f.magicMulHigh(res, uint64(magic), w, true) // signed high(res * magic), pinned
+	q := f.magicMulHigh(res, uint64(magic), w, true, false) // signed high(res * magic), pinned
 	if addN {
 		f.a.AluRR(0x01, q, res, w) // q += n
 	}
@@ -278,7 +300,7 @@ func (f *fn) divConstSignedMagic(res Reg, d int64, w, wantRem bool) {
 		f.a.Neg(q, w) // divisor was negative: negate the quotient
 	}
 	if wantRem {
-		f.remFromQuot(res, q, d, w) // res = n - q*d (d carries its sign; rem sign = dividend's)
+		f.remFromQuot(res, q, d, w, true) // res = n - q*d (d carries its sign; rem sign = dividend's)
 	} else {
 		f.a.MovReg64(res, q)
 	}
@@ -288,7 +310,24 @@ func (f *fn) divConstSignedMagic(res Reg, d int64, w, wantRem bool) {
 // magicMulHigh returns a pinned register holding the high W bits of res*magic
 // (signed iff signed). It uses RAX/RDX (spilling their occupants) but leaves res
 // untouched, since the caller keeps res out of RAX/RDX. The caller unpins.
-func (f *fn) magicMulHigh(res Reg, magic uint64, w, signed bool) Reg {
+func (f *fn) magicMulHigh(res Reg, magic uint64, w, signed, correction bool) Reg {
+	if f.opt(optWideUnsignedMulHigh) && !w && !signed && correction {
+		// Two unsigned 32-bit values have an exact 64-bit product. Keep the
+		// corrected quotient sequence in ordinary registers; simple reciprocal
+		// divisions retain the shorter native multiply-high sequence.
+		q := f.allocReg(maskOf(res))
+		f.pinned = f.pinned.add(q)
+		f.a.MovRegReg32(res, res)
+		if magic <= 0x7fffffff {
+			f.a.ImulRRI(q, res, int32(magic), true)
+		} else {
+			f.a.MovImm32(q, int32(uint32(magic)))
+			f.a.IMul(q, res, true)
+		}
+		f.a.ShiftImm(5, q, 32, true)
+		f.stats.peep("wide-unsigned-mul-high")
+		return q
+	}
 	f.spillIfUsed(RAX)
 	f.spillIfUsed(RDX)
 	f.pinned = f.pinned.add(RAX)
@@ -313,7 +352,20 @@ func (f *fn) magicMulHigh(res Reg, magic uint64, w, signed bool) Reg {
 
 // remFromQuot rewrites nreg (holding the dividend n) to n - q*d — the remainder,
 // given the already-computed quotient q. Low-W bits of q*d suffice (mod 2^W).
-func (f *fn) remFromQuot(nreg, q Reg, d int64, w bool) {
+func (f *fn) remFromQuot(nreg, q Reg, d int64, w, signed bool) {
+	if f.opt(optImmediateRemainder) && !w && !signed {
+		// The quotient has no further consumer. Only the low W product bits
+		// matter, so an i32 divisor can use its signed immediate bit pattern.
+		switch d {
+		case 3, 5, 9:
+			f.a.LeaScaledW(q, q, q, uint8(log2u(uint64(d-1))), 0, w)
+		default:
+			f.a.ImulRI(q, int32(d), w)
+		}
+		f.a.AluRR(0x29, nreg, q, w)
+		f.stats.peep("immediate-remainder")
+		return
+	}
 	t := f.allocReg(maskOf(nreg, q))
 	f.pinned = f.pinned.add(t)
 	f.a.MovImm64(t, uint64(d))

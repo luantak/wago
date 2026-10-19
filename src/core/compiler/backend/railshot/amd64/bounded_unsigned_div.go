@@ -7,22 +7,17 @@ import "os"
 // Native correctness and repeated application timing qualify this selection.
 // The zero override retains the ordinary constant-division path for comparison.
 var boundedUnsignedDivEnabled = os.Getenv("WAGO_AMD64_BOUNDED_UNSIGNED_DIV") != "0"
+var boundedRemainderLeaEnabled = os.Getenv("WAGO_AMD64_BOUNDED_REMAINDER_LEA") == "1"
 
-// No per-value range state: inspect only the immediate deferred mask producer.
-// Losing that producer simply retains the ordinary constant-division lowering.
-func boundedUnsignedDividend(e *elem) (uint32, bool) {
-	if e == nil || e.isValue() || e.valueType() != mtI32 || e.deferredOp() != opAnd {
+// Reuse the bounded integer proof for all supported expression producers and
+// current-region locals. Unknown or larger ranges retain ordinary lowering.
+func (f *fn) boundedUnsignedDividend(e *elem) (uint32, bool) {
+	if e == nil || e.valueType() != mtI32 {
 		return 0, false
 	}
-	for _, c := range [2]*elem{e.arg0, e.arg1} {
-		if c != nil && c.isValue() && c.st.kind == stConst {
-			mask := uint32(c.st.cval)
-			if mask > 0 && mask <= 65535 {
-				return mask, true
-			}
-		}
-	}
-	return 0, false
+	budget := 32
+	maximum := f.unsignedAddressMaximum(e, false, &budget)
+	return uint32(maximum), maximum > 0 && maximum <= 65535
 }
 
 // Let m=ceil(2^s/d), error=m*d-2^s. Then m*n/2^s >= n/d.
@@ -61,7 +56,12 @@ func (f *fn) divConstUnsignedBounded(res Reg, d, max, multiplier uint32, shift b
 	}
 	if rem {
 		// q*d <= n <= max, so the low 32-bit product is exact. q is dead.
-		f.a.ImulRI(q, int32(d), false)
+		if f.opt(optBoundedRemainderLea) && (d == 3 || d == 5 || d == 9) {
+			f.a.LeaScaledW(q, q, q, uint8(log2u(uint64(d-1))), 0, false)
+			f.stats.peep("bounded-remainder-lea")
+		} else {
+			f.a.ImulRI(q, int32(d), false)
+		}
 		f.a.Sub32(res, q)
 		f.pinned = f.pinned.remove(q)
 	}

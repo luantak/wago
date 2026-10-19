@@ -307,6 +307,36 @@ func TestSelectionAcrossWordBoundary(t *testing.T) {
 	}
 }
 
+func TestSelectionThirdWord(t *testing.T) {
+	bindings, _, definitions := testBindings(t, "amd64", false)
+	if len(definitions) <= 128 {
+		t.Fatal("AMD64 inventory must exercise the third selection word")
+	}
+	names := []string{definitions[0].Name, definitions[64].Name, definitions[128].Name}
+	overrides := map[string]bool{}
+	for _, name := range names {
+		overrides[name] = true
+	}
+	selection, err := bindings.ResolveSnapshot(overrides, Snapshot{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		option := bindings.Option(name)
+		if !selection.Enabled(name) || !selection.EnabledOption(option) || !selection.EnabledResolvedOption(option) {
+			t.Fatalf("lost %q", name)
+		}
+	}
+	overrides[names[2]] = false
+	changed, err := bindings.ResolveSnapshot(overrides, Snapshot{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed.Enabled(names[2]) || !selection.Enabled(names[2]) || !changed.Enabled(names[0]) || !changed.Enabled(names[1]) {
+		t.Fatal("selection words or immutable snapshot corrupted")
+	}
+}
+
 func testBindings(t *testing.T, arch string, initial bool) (*Bindings, []bool, []Definition) {
 	t.Helper()
 	definitions := ForArch(arch)

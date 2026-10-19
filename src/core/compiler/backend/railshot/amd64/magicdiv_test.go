@@ -262,7 +262,7 @@ func TestDivByConstExhaustive(t *testing.T) {
 	// Divisors covering: powers of two (+/-), the add-variant triggers (3,7,...),
 	// small odds/evens, large values, and high-bit unsigned divisors.
 	posDivs := []uint64{
-		2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 25, 100, 1000, 1024,
+		2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 25, 97, 100, 1000, 1024,
 		0x10000, 0x7fffffff, 0x80000000, 0xffffffff, 3000000000,
 		0x100000000, 0x123456789, 0x7fffffffffffffff, 0x8000000000000000,
 		0xffffffffffffffff, 0xaaaaaaaaaaaaaaab,

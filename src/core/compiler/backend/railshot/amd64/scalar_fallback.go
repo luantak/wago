@@ -14,6 +14,8 @@ import (
 // still precedes emission.
 var sharedScalarEnabled = false
 
+func (f *fn) ParameterRegister(int) (uint8, bool) { return 0, false }
+
 func (f *fn) admitScalar(*wasm.Func) shared.ScalarSummary { return shared.ScalarSummary{} }
 func (f *fn) scalarBody(*wasm.Func) error {
 	return fmt.Errorf("amd64: shared scalar pilot is unavailable in TinyGo or profiling builds")

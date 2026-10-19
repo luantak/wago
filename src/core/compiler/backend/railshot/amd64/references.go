@@ -32,6 +32,9 @@ func (f *fn) setStackGCRoot(e *elem, root bool) {
 // every push/pop/replace with no reader on the other side.
 
 func (f *fn) replaceStorage(e *elem, st storage) {
+	if e == f.addressValue {
+		f.addressValue = nil
+	}
 	f.s.forgetSpill(e)
 	f.s.canonicalSlots = false
 	// Replacements move the same semantic value between registers, locals, and
@@ -61,6 +64,9 @@ func (f *fn) pushValue(st storage) *elem {
 }
 
 func (f *fn) erase(e *elem) {
+	if e == f.addressValue {
+		f.addressValue = nil
+	}
 	f.s.clearElemCold(e)
 	f.s.erase(e)
 }

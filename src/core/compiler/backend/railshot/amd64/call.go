@@ -356,7 +356,7 @@ func (f *fn) callOp(r *wasm.Reader) error {
 	// so this is a pure operand-stack/local transform.
 	if !f.inlineTargets.empty() {
 		if t := f.inlineTargets.target(int(idx)); t != nil {
-			if _, ok := f.inlineBase[int(idx)]; (t.isI32AddConst() || ok) && (!t.recursive() || f.inlineDepth == 0) {
+			if _, ok := f.inlineBase[int(idx)]; (t.isI32AddConst() || ok) && f.allowInlineDepth(t) {
 				return f.inlineCall(t)
 			}
 		}
@@ -378,7 +378,7 @@ func (f *fn) callOp(r *wasm.Reader) error {
 	// int result feeds a pinned local moves RAX straight into the local's
 	// register — no intermediate result register, no separate set lowering.
 	hint := -1
-	if f.opt(optRegABI) && sigFitsRegABI(ft) && sigIsIntOnly(ft) && len(ft.Results) == 1 {
+	if f.inlineDepth == 0 && f.opt(optRegABI) && sigFitsRegABI(ft) && sigIsIntOnly(ft) && len(ft.Results) == 1 {
 		r2 := *r // peek past the call without committing
 		if b, err := r2.Byte(); err == nil && b == 0x21 {
 			if x, err := r2.U32(); err == nil {

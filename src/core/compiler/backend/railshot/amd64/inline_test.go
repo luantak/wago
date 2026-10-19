@@ -572,7 +572,7 @@ func TestCompactInlineAdmitsTinySingleUseLeafAMD64(t *testing.T) {
 
 func TestFinalizeOmittedInlineEntriesRejectsResidualCallAMD64(t *testing.T) {
 	targets := inlineTargetTable{data: &inlineTargetData{
-		slots: []uint32{0, 1}, targets: []inlineTarget{{globalIdx: 1, omitStandalone: true}},
+		slots: []uint32{0, 1}, targets: []inlineTarget{{globalIdx: 1, params: inlineOmitStandaloneFlag}},
 	}}
 	err := finalizeOmittedInlineEntriesAMD64(
 		[]int{0, 12}, []int{4, 12},

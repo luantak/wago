@@ -70,6 +70,20 @@ func (f *fn) condense(node *elem, dest Reg) Reg {
 	f.stats.addCondense()
 	switch {
 	case isBinALU(node.deferredOp()):
+		if r, ok := f.tryBooleanChain(node, dest); ok {
+			return r
+		}
+		// A longer boolean chain can lose its scratch allocation opportunity
+		// before emission. Restore ordinary bounded segments before recursing.
+		if node.deferredDepth() > maxDeferDepth {
+			if deferDepthOf(node.arg0) >= maxDeferDepth {
+				f.materialize(node.arg0)
+			}
+			if deferDepthOf(node.arg1) >= maxDeferDepth {
+				f.materialize(node.arg1)
+			}
+			labelDeferredNode(node)
+		}
 		return f.condenseBinary(node, dest)
 	case isShift(node.deferredOp()):
 		return f.condenseShift(node, dest)
@@ -135,6 +149,18 @@ func (f *fn) condenseConvert(node *elem, dest Reg) Reg {
 // and mul: compute the left operand into dest, then fold the right operand in
 // place (const→imm, memory→r/m, reg→reg).
 func (f *fn) condenseBinary(node *elem, dest Reg) Reg {
+	if cmp := node.arg1; cmp.isDeferred() {
+		op := cmp.deferredOp()
+		if op == opLtU || op == opGeU || op == opGtU || op == opLeU {
+			if r := f.tryComparisonAccumulate(node, dest); r != regNone {
+				return r
+			}
+		}
+	}
+	if r := f.tryBMI1Logic(node, dest); r != regNone {
+		return r
+	}
+	f.prepareDeferredMemoryLeft(node)
 	w := node.valueType().is64()
 	left := node.arg0
 	right := node.arg1
@@ -205,6 +231,9 @@ func (f *fn) condenseBinary(node *elem, dest Reg) Reg {
 		}
 	}
 
+	if r := f.tryLinearIntegerTree(node, dest); r != regNone {
+		return r
+	}
 	if r := f.tryAssociativeTree(node, dest); r != regNone {
 		return r
 	}
@@ -641,6 +670,9 @@ func (f *fn) emitLeaAdd(dst, base Reg, right *elem, w bool) {
 // immediate shift; a variable count must live in CL (x86 constraint), so it is
 // forced into RCX and the value is shifted by CL.
 func (f *fn) condenseShift(node *elem, dest Reg) Reg {
+	if r := f.tryLeaDouble(node, dest); r != regNone {
+		return r
+	}
 	w := node.valueType().is64()
 	digit := shiftDigit(node.deferredOp())
 	left := node.arg0
@@ -705,6 +737,9 @@ func (f *fn) condenseShift(node *elem, dest Reg) Reg {
 		return dest
 	}
 
+	if result, ok := f.tryBMI2Shift(node, dest); ok {
+		return result
+	}
 	// Keep the left operand spillable while evaluating the count.
 	f.materialize(left)
 	cnt := f.materialize(right)
@@ -1093,6 +1128,9 @@ func (f *fn) cmpIntMin(w bool) {
 // (the target-hint / in-place path — the left spine of an accumulator writes
 // straight into dest).
 func (f *fn) condenseInto(e *elem, dest Reg) {
+	if e.isValue() && e.st.kind == stReg && !e.st.typ.isXMM() {
+		e.st.cval = 0
+	}
 	if regallocCheckEnabled {
 		f.checkUse(e)
 	}

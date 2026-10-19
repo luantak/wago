@@ -52,6 +52,9 @@ func (f *fn) representationError() error {
 // and returns control to the caller's body.
 func (f *fn) bodyLoop(r *wasm.Reader, minCtrl int) error {
 	for len(f.ctrl) > minCtrl {
+		if f.selectGroupEnd != 0 {
+			f.finishSelectGroup(r.Offset())
+		}
 		if !profileEnabled && minCtrl == 0 && !f.unreachable && f.s.logicalDepth == 0 &&
 			(f.s.cur != 0 || len(f.s.chunks[0]) >= defaultStackArenaCap) {
 			f.recycleEmptyOperandArena()
@@ -134,6 +137,9 @@ func (f *fn) bodyLoop(r *wasm.Reader, minCtrl int) error {
 		if regallocCheckEnabled {
 			checkNativeSourceAfter(f, r.Offset())
 		}
+		if !f.usesCalls && (op == 0x1b || op == 0x22) {
+			f.beginSelectGroup(r)
+		}
 	}
 	if f.representationLimit != functionRepresentationOK {
 		return f.representationError()
@@ -170,6 +176,7 @@ func (f *fn) recycleEmptyOperandArena() {
 	clear(f.tmpDeferred[:f.tmpDeferredWritten])
 	f.tmpRootsWritten, f.tmpBelowWritten, f.tmpDeferredWritten = 0, 0, 0
 	f.stats.peep("operand-arena-recycle")
+	f.addressValue = nil
 	f.s.reset()
 }
 
@@ -203,7 +210,7 @@ func (f *fn) emitPlain(r *wasm.Reader, op byte) error {
 	case 0x1a: // drop
 		f.dropValue()
 	case 0x1b: // select
-		f.emitSelect()
+		f.emitSelect(r)
 	case 0x1c: // select t (typed) — consume the declared result types
 		if err := wasm.SkipInstructionImmediate(r, op); err != nil {
 			return err
@@ -878,16 +885,31 @@ func (f *fn) tryFbinLocalSet(r *wasm.Reader, memOp byte, f64 bool) (bool, error)
 // emitSelect lowers `select`: result = cond != 0 ? a : b, where the operand
 // stack holds a, then b, then cond on top. Lowered to test + cmove (if cond == 0,
 // move b into a). Materialized eagerly (select is a sink for its operands).
-func (f *fn) emitSelect() {
+func (f *fn) emitSelect(readers ...*wasm.Reader) {
 	// Wasm evaluates a, b, and cond in that order, including the unselected
 	// branch. Force earlier traps before either select path evaluates cond;
 	// otherwise a condition's divide-by-zero can hide a branch's overflow.
 	f.materializeTrapsBefore(f.s.back())
+	if f.trySelectComparePair(f.s.back()) {
+		return
+	}
+	if len(readers) != 0 && f.trySelectLocalSink(readers[0]) {
+		return
+	}
+	if len(readers) != 0 && f.trySelectFlagsSink(readers[0]) {
+		return
+	}
+	if f.tryPureSelectGuard(f.s.back()) {
+		return
+	}
 	// Flags-select: when the condition is a deferred relational/eqz compare and both
 	// branches are integers, emit the compare's CMP and a CMOV on its flags directly
 	// — skipping the SETcc + MOVZX + TEST that materializing the boolean costs. The
 	// compare is condensed last (right before the CMOV), so its flags are live.
-	if top := f.s.back(); isFusableCompare(top) && !top.valueType().isFloat() && f.trySelectOnFlags(top) {
+	if top := f.s.back(); f.isFusableTruth(top) && !top.valueType().isFloat() && f.trySelectOnFlags(top) {
+		return
+	}
+	if f.trySelectFrame(f.s.back()) {
 		return
 	}
 	// Keep all operands linked until their deferred work is complete. Div/rem
@@ -1172,12 +1194,36 @@ func (f *fn) v128TeeOverwritten(r *wasm.Reader, x int) bool {
 }
 
 func (f *fn) setLocal(reader *wasm.Reader, x int, tee bool) {
+	f.forgetLocalSpillCopies(x)
 	if regallocCheckEnabled {
 		checkNativeSourceSet(f, x, tee, f.s.back())
 	}
+	e := f.s.back()
+	// A borrowed reference to this same current local is a self-assignment.
+	// This also completes a select that already wrote its destination register.
+	if f.opt(optSelectLocalSink) && e != nil && e.isValue() && e.st.kind == stLocalReg && e.st.index() == x {
+		if !tee {
+			f.erase(e)
+		}
+		return
+	}
+	if f.opt(optMemoryMinimumBounds) && f.m != nil && len(f.m.Memories) != 0 && e != nil && (e.st.typ == mtI32 || e.st.typ == mtI64) {
+		budget := 32
+		maximum := f.unsignedAddressMaximum(e, e.st.typ == mtI64, &budget)
+		// Commit only after lowering finishes: materialization can invalidate
+		// region facts and a self-update must read the previous local value.
+		defer func() {
+			f.rememberAddressMaximum(x, maximum)
+			// An unpinned tee retains an independent owned value, not a local
+			// reference. Keep its range until replacement/erasure or a control
+			// boundary; later writes to the local cannot change this copy.
+			if tee && e.isValue() && (e.st.kind == stReg || e.st.kind == stSlot) {
+				f.addressValue, f.addressValueMaximum = e, maximum
+			}
+		}()
+	}
 	f.invalidateBoundsCertFor(1, uint32(x))
 	f.clearV128LocalAliases(x)
-	e := f.s.back()
 	f.invalidateGCLoadFactsForLocal(x)
 	if e != nil && e.isValue() && e.st.typ == mtCustom {
 		panic("custom value cannot be stored in a Wasm local")
@@ -1189,6 +1235,7 @@ func (f *fn) setLocal(reader *wasm.Reader, x int, tee bool) {
 	if e != nil && e.isDeferred() && subtreeBorrowsLocalAddress(e, x) {
 		f.condense(e, regNone)
 	}
+	f.avoidLocalSinkSpill(e, x)
 	// In-place self-update `local.set $x (op (local.get $x) …)`: let condenseInto
 	// consume the top expression straight into x's register instead of pre-copying
 	// its (local.get $x) operand. The condense paths (binary, shift, unary, convert)
@@ -1202,6 +1249,7 @@ func (f *fn) setLocal(reader *wasm.Reader, x int, tee bool) {
 			skipFrom = baseOfValentBlock(e)
 		}
 	}
+	f.realizePureLocalRoots(x, skipFrom)
 	f.realizeLocalRefs(x, skipFrom)
 	if reader != nil {
 		f.activateIntervalLocal(x, reader.Offset(), false)
@@ -1213,6 +1261,9 @@ func (f *fn) setLocal(reader *wasm.Reader, x int, tee bool) {
 		// allocator scratch registers.
 		if f.pinRelinquished && f.regUser[pr] != nil {
 			f.spillIfUsed(pr)
+		}
+		if f.keepOwnedPinnedTee(e, x, pr, tee) {
+			return
 		}
 		// A stack-backed tee already has a valid independent copy. A following
 		// branch canonicalizes its predicate, so retaining that copy avoids
@@ -1351,6 +1402,10 @@ func (f *fn) setLocal(reader *wasm.Reader, x int, tee bool) {
 	r := f.materialize(e)
 	f.storeFrameInt(f.localAddr(x), r, f.localType[x])
 	f.locals[x].state = lsMem
+	if tee && f.opt(optLocalSpillReuse) && !e.st.hasGCRoot() && !f.gcFrameLocal(x) &&
+		(f.localType[x] == mtI32 || f.localType[x] == mtI64) {
+		e.st.cval = int64(x + 1)
+	}
 	if !tee {
 		f.erase(e)
 		f.release(r)

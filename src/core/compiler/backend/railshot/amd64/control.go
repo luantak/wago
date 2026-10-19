@@ -47,6 +47,11 @@ const (
 	ctrlIfDeferredPrefix
 )
 
+// Bits 12-13 hold the float constant base. Saved outer ranges use bit 14;
+// they share the cold loop word with mutually exclusive straight-line pin plans.
+const ctrlLoopSavedRange ctrlFlags = 1 << 14
+const ctrlLoopOuterRange ctrlFlags = 1 << 15
+
 // ctrlFrame is one open control construct (or the implicit function frame).
 type ctrlFrame struct {
 	kind       ctrlKind
@@ -762,7 +767,9 @@ func (f *fn) convergeFrameBranchState(fr *ctrlFrame) {
 
 func (f *fn) convergeFrameEntryState(fr *ctrlFrame) {
 	state := f.frameEntryState(fr)
-	f.convergeEdgeTo(&state)
+	if !f.snapshotCallFreeIfEntry(&state) {
+		f.convergeEdgeTo(&state)
+	}
 	f.setFrameEntryState(fr, state)
 }
 
@@ -1465,6 +1472,7 @@ func scanLoopCallFreeDetails(r *wasm.Reader, classifier wasm.ModuleInstructionCl
 	brTable := false
 	nestedLoop := false
 	hasInnerControl := false
+	innerBackedge, outerBackedge := false, false
 	type candidate struct {
 		st    storage
 		score uint32
@@ -1538,6 +1546,14 @@ func scanLoopCallFreeDetails(r *wasm.Reader, classifier wasm.ModuleInstructionCl
 			hasInnerControl = true
 		}
 		switch imm.Kind {
+		case wasm.InstrBr, wasm.InstrBrIf:
+			if imm.Index == uint32(depth) {
+				if depth == 0 {
+					outerBackedge = true
+				} else {
+					innerBackedge = true
+				}
+			}
 		case wasm.InstrCall, wasm.InstrCallIndirect, wasm.InstrReturnCall,
 			wasm.InstrReturnCallIndirect, wasm.InstrCallRef, wasm.InstrReturnCallRef,
 			wasm.InstrMemoryGrow:
@@ -1574,10 +1590,11 @@ func scanLoopCallFreeDetails(r *wasm.Reader, classifier wasm.ModuleInstructionCl
 			if depth == 0 {
 				// Nested loop entries already reconcile their own pin state. An
 				// outer register-only header can add stores at that inner entry
-				// without removing stores on its hot backedge. Inner blocks and
-				// ifs likewise create merge edges where the weaker register-only
-				// state adds reconciliation outside the loop latch.
-				if brTable || nestedLoop || hasInnerControl {
+				// without removing stores on its hot backedge. With inner control,
+				// promote only when every backedge bypasses the inner end merge.
+				// A latch after that merge can merely move synchronization from
+				// the latch to the merge, adding code without reducing hot traffic.
+				if brTable || nestedLoop || hasInnerControl && (!innerBackedge || outerBackedge) {
 					return finish(0)
 				}
 				return finish(writes)
@@ -1644,6 +1661,11 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 	loopFloatConstOK := false
 	var loopPinPlan uint64
 	var loopPinWrites uint64
+	var loopRangeLocal uint32
+	var loopRangeMaximum uint64
+	if kind == cfLoop && !f.unreachable && pN == 0 && rN == 0 {
+		loopRangeLocal, loopRangeMaximum = f.planStructuredLoopRange(r)
+	}
 	if kind == cfLoop && !f.unreachable && pN == 0 && rN == 0 && loopPinExchangeEnabled {
 		loopPinPlan, loopPinWrites = f.planLoopPinExchange(r)
 	}
@@ -1696,7 +1718,7 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 		}
 		// Preserve older spill homes; an isolated owned predicate can remain
 		// tracked without a canonical stack round trip.
-		f.flushBranchPredicate(cond)
+		f.flushBranchPredicate(cond, false)
 		f.convergeFrameEntryState(&fr)
 		creg, cOwned := f.popBranchCondition()
 		fr.height = f.depth() - pN
@@ -1732,6 +1754,12 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 					}
 				}
 			}
+			if pN == 0 && rN == 0 {
+				f.emitPureReduce(r)
+				f.emitForwardByteCopy(r)
+				f.emitIntegerMemoryLoop(r)
+				f.emitIntegerPacket(r)
+			}
 			f.convergeFrameBranchState(&fr) // records the loop-header local homes
 			if fr.has(ctrlLoopCallFree) && loopRegState && loopPinnedWrites != 0 {
 				state := f.frameBranchState(&fr)
@@ -1765,6 +1793,11 @@ func (f *fn) opBlock(r *wasm.Reader, op byte) error {
 		}
 	}
 	f.pushCtrl(&fr)
+	if loopRangeLocal != 0 {
+		if f.activateLoopAddressRange(loopRangeLocal, loopRangeMaximum) {
+			f.stats.peep("structured-loop-range")
+		}
+	}
 	return nil
 }
 
@@ -2256,6 +2289,13 @@ func (f *fn) opEnd() error {
 		f.linearSumLoop = 0
 		f.linearSumLoopDepth = 0
 	}
+	if fr.kind == cfLoop && f.loopAddressDepth == last+1 {
+		nested := fr.has(ctrlLoopOuterRange)
+		f.loopAddressLocal, f.loopAddressMaximum, f.loopAddressDepth = 0, 0, 0
+		if nested {
+			f.restoreEnclosingLoopAddressRange(last)
+		}
+	}
 	branchState := f.frameBranchState(&fr)
 	entryState := f.frameEntryState(&fr)
 	baseGCRoots := f.frameBaseGCRoots(&fr)
@@ -2405,6 +2445,8 @@ func (f *fn) opEnd() error {
 		}
 		f.ehTryDepth--
 	}
+	f.finishPureReduce(last + 1)
+	f.finishIntegerMemoryLoop(last + 1)
 	if fr.has(ctrlLoopPinExchange) {
 		f.restoreLoopPinExchange(f.ctrlMerge(&fr).loopPinPlan, endReachable)
 	}
@@ -2476,13 +2518,21 @@ func (f *fn) opBr(r *wasm.Reader, conditional bool) error {
 	}
 	// Fuse `<compare> br_if L` into CMP + conditional jump. (Local convergence is
 	// per-target and happens after the label frame is resolved.)
+	if conditional && f.tryConditionalMemoryStore(r) {
+		return nil
+	}
 	if conditional && isFusableCompare(f.s.back()) {
 		top := f.s.back()
 		idx, err := r.U32()
 		if err != nil {
 			return err
 		}
-		return f.brIfFused(r, top, idx)
+		local, maximum, bounded := f.branchFallthroughMaximum(top)
+		err = f.brIfFused(r, top, idx)
+		if err == nil && bounded {
+			f.rememberAddressMaximum(local, maximum)
+		}
+		return err
 	}
 	var predicate *elem
 	if conditional {
@@ -2493,7 +2543,10 @@ func (f *fn) opBr(r *wasm.Reader, conditional bool) error {
 		}
 		// Keep the predicate tracked through local convergence, staging
 		// existing spill homes whenever there is an older operand.
-		f.flushBranchPredicate(predicate)
+		look := *r
+		label, err := look.U32()
+		loopBackedge := err == nil && uint64(label) < uint64(len(f.ctrl)) && f.ctrl[len(f.ctrl)-1-int(label)].kind == cfLoop
+		f.flushBranchPredicate(predicate, loopBackedge)
 	}
 	idx, err := r.U32()
 	if err != nil {
@@ -2716,6 +2769,7 @@ func (f *fn) opBrTable(r *wasm.Reader) error {
 	f.flushBelow(index)
 	f.reconcileLocals() // establish every case's local homes before dispatch
 	ireg := f.materialize(index)
+	canonicalIndex := f.opt(optValueFacts) && index.st.valueFacts().has(factUpper32Zero)
 	f.erase(index)
 	d := f.depth()
 	f.pinned = f.pinned.add(ireg)
@@ -2743,6 +2797,10 @@ func (f *fn) opBrTable(r *wasm.Reader) error {
 		}
 		f.restoreBranchHandlers(fi)
 		f.branchJump(fr)
+	}
+	if f.emitRangeTableDispatch(labels, def, ireg, emitCase) {
+		f.unreachable = true
+		return nil
 	}
 	if len(labels) >= brTableJumpMin {
 		f.hasJumpTableData = true
@@ -2773,8 +2831,15 @@ func (f *fn) opBrTable(r *wasm.Reader) error {
 			f.a.LeaScaled(RDX, RDX, RDX, 2, 0)             // RDX = ID * 5
 			f.a.LeaScaled(RDX, RAX, RDX, 0, int32(len(labels)))
 		} else {
-			f.a.ShiftImm(4, ireg, 2, false) // idx *= 4 (u32 entries)
-			f.a.LoadIdx(RDX, RAX, ireg, 0, 4, true, true)
+			if f.opt(optScaledJumpTable) && canonicalIndex {
+				// Only replace a proven 32-bit index: this removes an instruction
+				// outright, without introducing an explicit zero-extension move.
+				f.a.LoadSigned32Scaled(RDX, RAX, ireg, 2, 0)
+				f.stats.peep("scaled-jump-table")
+			} else {
+				f.a.ShiftImm(4, ireg, 2, false) // idx *= 4 (u32 entries)
+				f.a.LoadIdx(RDX, RAX, ireg, 0, 4, true, true)
+			}
 			f.a.AluRR(0x01, RDX, RAX, true) // target = table base + entry
 		}
 		f.a.JmpReg(RDX)

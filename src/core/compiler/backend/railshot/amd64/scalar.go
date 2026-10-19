@@ -56,10 +56,20 @@ func (f *fn) Registers() ([]uint8, uint64) {
 	return scalarRegisterOrder, uint64(f.reserved.union(f.pinned))
 }
 
-// AMD64 entry code continues to establish parameter frame homes.
-func (f *fn) ParameterRegister(int) (uint8, bool) { return 0, false }
-func (f *fn) SpillOffset(slot int) int32          { return f.spillOff(slot) }
-func (f *fn) Position() int                       { return f.a.Len() }
+func (f *fn) ParameterRegister(local int) (uint8, bool) {
+	// Register-ABI entries leave integer arguments untouched. Transfer ownership
+	// directly to the shared allocator, as ARM64 does, instead of storing and
+	// immediately reloading them. Wrapper entries still use frame homes.
+	if f.compactFrameHeader && local < len(intArgRegs) {
+		reg := intArgRegs[local]
+		if !f.reserved.union(f.pinned).has(reg) {
+			return uint8(reg), true
+		}
+	}
+	return 0, false
+}
+func (f *fn) SpillOffset(slot int) int32 { return f.spillOff(slot) }
+func (f *fn) Position() int              { return f.a.Len() }
 
 func (f *fn) LocalOffset(local int) int32 { return f.localAddr(local) }
 func (f *fn) Constant(r uint8, v int64, wide bool) {
@@ -80,6 +90,7 @@ func (f *fn) Move(d, s uint8, w bool) {
 }
 func (f *fn) NormalizeI32(r uint8) { f.a.MovRegReg32(Reg(r), Reg(r)) }
 func (f *fn) Load(r uint8, off int32, w bool) {
+	f.scalarFrameUsed = true
 	if w {
 		f.a.Load64(Reg(r), RSP, off)
 	} else {
@@ -87,6 +98,7 @@ func (f *fn) Load(r uint8, off int32, w bool) {
 	}
 }
 func (f *fn) Store(off int32, r uint8, w bool) {
+	f.scalarFrameUsed = true
 	if w {
 		f.a.Store64(RSP, off, Reg(r))
 	} else {
@@ -119,12 +131,16 @@ func (f *fn) scalarCmp(op shared.IntOp, w bool, l Reg, r shared.ScalarOperand) {
 	case shared.ScalarConstant:
 		f.a.AluRI(7, l, int32(r.Constant), w)
 	case shared.ScalarFrame:
+		f.scalarFrameUsed = true
 		f.a.AluRM(0x3b, l, RSP, r.Offset, w)
 	default:
 		f.a.AluRR(0x39, l, Reg(r.Reg), w)
 	}
 }
 func (f *fn) Binary(op shared.IntOp, w bool, d, l uint8, r shared.ScalarOperand) {
+	if r.Kind == shared.ScalarFrame {
+		f.scalarFrameUsed = true
+	}
 	dst, left := Reg(d), Reg(l)
 	if op >= shared.IntEq && op <= shared.IntGeU {
 		f.scalarCmp(op, w, left, r)

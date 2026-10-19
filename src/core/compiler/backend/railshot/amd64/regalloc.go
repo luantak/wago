@@ -152,7 +152,9 @@ func (f *fn) allocRegOrNone(avoid regMask) Reg {
 	for e := f.s.firstUnspilled(); e != f.s.head; e = e.next {
 		if e.isValue() && e.st.kind == stReg && !e.st.typ.isXMM() && !block.has(e.st.reg) {
 			r := e.st.reg
-			f.spill(e)
+			if !f.reuseLocalSpill(e) {
+				f.spill(e)
+			}
 			return r
 		}
 	}
@@ -330,6 +332,7 @@ func (f *fn) materialize(e *elem) Reg {
 	}
 	switch e.st.kind {
 	case stReg:
+		e.st.cval = 0 // materialize permits destructive consumption
 		return e.st.reg
 	case stConst:
 		r := f.allocReg(0)

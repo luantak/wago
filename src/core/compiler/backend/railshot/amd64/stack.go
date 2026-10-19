@@ -195,8 +195,8 @@ func (e *elem) setDeferredOp(op wOp) {
 }
 
 // deferredDepth is the deferred-subtree height. registerNeed is its bounded
-// Sethi-Ullman label. Both fit in a byte: depth is capped at maxDeferDepth and
-// register demand cannot exceed that height plus one.
+// Sethi-Ullman label. Both fit in a byte: arithmetic depth is capped at
+// maxDeferDepth; fixed-scratch boolean reductions have at most 16 leaves.
 func (e *elem) deferredDepth() int16 { return int16(uint8(e.st.slot >> 8)) }
 func (e *elem) setDeferredDepth(depth int16) {
 	e.st.slot = e.st.slot&^0xff00 | uint32(uint8(depth))<<8
@@ -623,10 +623,11 @@ func (f *fn) pushBinOp(op wOp, typ machineType) {
 	// op would push the subtree past maxDeferDepth, so the tree condense() later
 	// walks never pins more registers than the file holds. Rare on real code
 	// (shallow trees), essential for pathological chains.
-	if deferDepthOf(left) >= maxDeferDepth {
+	extendChain := (deferDepthOf(left) >= maxDeferDepth || deferDepthOf(right) >= maxDeferDepth) && f.extendBooleanChain(op, typ, left, right)
+	if deferDepthOf(left) >= maxDeferDepth && !extendChain {
 		f.materialize(left)
 	}
-	if deferDepthOf(right) >= maxDeferDepth {
+	if deferDepthOf(right) >= maxDeferDepth && !extendChain {
 		f.materialize(right)
 	}
 	node := f.s.alloc()
