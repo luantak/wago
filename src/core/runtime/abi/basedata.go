@@ -34,9 +34,14 @@ const (
 	// accesses keep the direct RBX/basedata hot path; memory.grow also consults
 	// entry 0 when an optional per-instance quota directory is present. Offset 64
 	// was the unused WARP memory-helper slot.
-	MemoryDirPtrOffset  = 64
-	MemoryDirEntryBytes = 24
-	MemoryDirBaseOffset = 0
+	// SharedNotifyPendingOffset aliases the unused directory cell in a shared
+	// backing only. Shared memories always have separate instance control;
+	// the cell publishes whether a wait is registering or already queued,
+	// requiring notify to acquire the queue mutex.
+	SharedNotifyPendingOffset = 64
+	MemoryDirPtrOffset        = 64
+	MemoryDirEntryBytes       = 24
+	MemoryDirBaseOffset       = 0
 	// Directory sizes are entry/selected-grow snapshots. Native indexed size
 	// and bounds reads use the authoritative fields below MemoryDirBaseOffset's
 	// backing pointer so aliases stay coherent across native calls.

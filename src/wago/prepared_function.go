@@ -588,7 +588,7 @@ func (fn *WasmFunc) callScalarHostPrepared() error {
 		if err != nil {
 			return err
 		}
-		if in.boundedHostSegments() && preparedHostFixedEnabled {
+		if (in.boundedHostSegments() || in.boundedFixedSharedHostPortal()) && preparedHostFixedEnabled {
 			if err := fn.hostPrepared.EnableBoundedSegments(runtimebridge.GrantHostScalarCall()); err != nil {
 				return err
 			}
@@ -599,7 +599,7 @@ func (fn *WasmFunc) callScalarHostPrepared() error {
 			ctrl:                        offHeapSlicePtr(in.ctrl),
 			state:                       in.ensurePluginState(),
 			entryNativeMu:               entry.local,
-			parkedNativeContextReusable: in.gc == nil && !in.c.threadedMemory0(),
+			parkedNativeContextReusable: in.parkedHostControlReusable(),
 		}
 		if preparedHostFixedEnabled {
 			switch in.syncHosts[0].scalarKind {

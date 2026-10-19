@@ -30,6 +30,8 @@ const (
 	executionFlagStoreOwnedGCCollector
 	executionFlagPreparedActive
 	executionFlagNativeScalarLeaf
+	executionFlagForeignNativeCalls
+	executionFlagThreadedMemory
 )
 
 type invocationID uint64
@@ -205,7 +207,7 @@ func (in *Instance) beginNativeEntry() (executionLease, error) {
 		}
 		mu.Unlock()
 	}
-	if in.threadedMemoryZero {
+	if in.usesPrivateThreadedExecution() {
 		mu := &in.memoryDir.nativeMu
 		mu.Lock()
 		if err := in.bindAndValidateNativeContext(); err != nil {
@@ -319,6 +321,12 @@ func (in *Instance) invalidateNativeContext() {
 	}
 }
 
+// Host return can reuse private control while refreshing shared-memory entries.
+// Collector-owned context still needs the full bind after every callback.
+func (in *Instance) parkedHostControlReusable() bool {
+	return in.gc == nil && in.executionFlags.Load()&(executionFlagImportedGCDomain|executionFlagDynamicGCDomain|executionFlagStoreOwnedGCCollector) == 0
+}
+
 func (in *Instance) canReuseParkedNativeContext(version uint64) bool {
 	return in.canReuseParkedNativeContextWithState(version, in.ensurePluginState())
 }
@@ -347,12 +355,20 @@ func (in *Instance) refreshMemoryDirectory() error {
 		if memory == nil {
 			return fmt.Errorf("indexed memory %d is unavailable", i)
 		}
-		jm := memory.jobMemory()
+		var jm *wruntime.JobMemory
+		if i < len(dir.sharedBackings) {
+			jm = dir.sharedBackings[i]
+		}
+		shared := jm != nil
+		if !shared {
+			jm = memory.jobMemory()
+			shared = in.c.memoryDef(i).Shared
+		}
 		if jm == nil {
 			return fmt.Errorf("indexed memory %d owner is closed", i)
 		}
 		entry := dir.native[i*abi.MemoryDirEntryBytes:]
-		if !in.threadedMemoryZero {
+		if !shared {
 			jm.SetGuardOwner(in.jm.LinMemBase())
 		}
 		pages := jm.CurrentPages()
@@ -382,7 +398,7 @@ func (in *Instance) unlockNativeEntry(l executionLease) {
 	if l.privateContext() {
 		return
 	}
-	if l.local != nil && !in.threadedMemoryZero && !in.usesIndependentExecution() {
+	if l.local != nil && !in.usesPrivateThreadedExecution() && !in.usesIndependentExecution() {
 		nativeExecutionMu.Unlock()
 		return
 	}
@@ -406,13 +422,24 @@ func (in *Instance) usesIndependentExecution() bool {
 	return flags&executionFlagIndependent != 0 && flags&executionFlagNativeControlShared == 0
 }
 
+// Sharing linear memory leaves each instance's control private. Exporting or
+// importing native callables also shares basedata and parked control frames;
+// those graphs use the process-wide lease until native contexts are isolated.
+func (in *Instance) usesPrivateThreadedExecution() bool {
+	if in == nil {
+		return false
+	}
+	flags := in.executionFlags.Load()
+	return (in.threadedMemoryZero || flags&executionFlagThreadedMemory != 0) && flags&(executionFlagNativeControlShared|executionFlagForeignNativeCalls) == 0
+}
+
 func (in *Instance) markNativeControlShared() {
 	state := in.ensurePluginState()
 	state.invokeMu.revokeFast()
 	var localMu *sync.Mutex
 	var retainedGate *preparedHostLeaseGate
 	state.nativeShareMu.Lock()
-	if in.usesIndependentExecution() {
+	if in.usesIndependentExecution() || in.usesPrivateThreadedExecution() {
 		if gate := state.preparedHostGate; gate != nil {
 			retainedGate = gate
 		} else {
@@ -460,7 +487,7 @@ func (in *Instance) nativeControlIsShared() bool {
 }
 
 func (in *Instance) lockThreadedInstanceState() *sync.Mutex {
-	if in == nil || !in.threadedMemoryZero {
+	if in == nil || (!in.threadedMemoryZero && in.executionFlags.Load()&executionFlagThreadedMemory == 0) {
 		return nil
 	}
 	in.memoryDir.invokeMu.Lock()
@@ -475,7 +502,7 @@ func (in *Instance) acquireInstanceNativeStateForHostAccess() *sync.Mutex {
 	mu := &nativeExecutionMu
 	if in.usesIndependentExecution() {
 		mu = in.independentNativeExecutionMu()
-	} else if in != nil && in.threadedMemoryZero {
+	} else if in != nil && in.usesPrivateThreadedExecution() {
 		mu = &in.memoryDir.nativeMu
 	}
 	mu.Lock()
