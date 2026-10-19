@@ -242,6 +242,17 @@ func (a *Asm) regallocGPSSE(prefix, opcodeMap, op byte, reg, rm Reg, memory bool
 }
 
 func (a *Asm) regallocGPVEX(opcodeMap, pp, op byte, reg, rm Reg, memory bool) {
+	if opcodeMap == vexMap0F38 && pp == 0 && op == 0xf2 {
+		a.regallocGPWrite(regallocGPRegMask(reg)) // ANDN
+		return
+	}
+	if opcodeMap == vexMap0F38 && pp >= 1 && pp <= 3 && op == 0xf7 {
+		a.regallocGPWrite(regallocGPRegMask(reg)) // SHLX/SARX/SHRX
+		return
+	}
+	if opcodeMap == vexMap0F3A && pp == 1 && op == 0 {
+		return // VPERMQ writes only the vector destination.
+	}
 	if pp&^3 != 0 {
 		a.regallocGPWrite(0xffff)
 		return

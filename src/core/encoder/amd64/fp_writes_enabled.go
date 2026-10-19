@@ -116,6 +116,16 @@ func (a *Asm) regallocFPSSE(prefix, opcodeMap, op byte, reg, rm Reg, memory bool
 }
 
 func (a *Asm) regallocFPVEX(opcodeMap, pp, op byte, reg, vvvv, rm Reg, memory bool) {
+	if opcodeMap == vexMap0F38 && pp == 0 && op == 0xf2 {
+		return // ANDN writes only a GP destination.
+	}
+	if opcodeMap == vexMap0F38 && pp >= 1 && pp <= 3 && op == 0xf7 {
+		return // SHLX/SARX/SHRX write only a GP destination.
+	}
+	if opcodeMap == vexMap0F3A && pp == 1 && op == 0 {
+		a.regallocFPWrite(regallocFPRegMask(reg)) // VPERMQ
+		return
+	}
 	if pp&^3 != 0 {
 		a.regallocFPWrite(0xffff)
 		return

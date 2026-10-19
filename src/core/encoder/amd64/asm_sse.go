@@ -196,6 +196,21 @@ func (a *Asm) Rorx(dst, src Reg, count byte, w bool) {
 	a.emit(count)
 }
 
+// ShiftX emits BMI2 SHLX (pp=1), SARX (pp=2), or SHRX (pp=3).
+// The count is masked to five/six bits by the CPU, matching Wasm shifts.
+func (a *Asm) ShiftX(dst, src, count Reg, pp byte, w bool) {
+	if pp < 1 || pp > 3 {
+		panic("invalid BMI2 shift")
+	}
+	a.UsesBMI2 = true
+	a.vexRR(vexFormat(vexMap0F38, pp, 0, w), 0xF7, dst, count, src)
+}
+
+// AndNot emits BMI1 ANDN dst, inverted, value: dst = ^inverted & value.
+func (a *Asm) AndNot(dst, inverted, value Reg, w bool) {
+	a.vexRR(vexFormat(vexMap0F38, 0, 0, w), 0xF2, dst, inverted, value)
+}
+
 func (a *Asm) vex3MemPrefixL(opcodeMap, pp byte, reg Reg, src1 Reg, hasSrc1 bool, base Reg, index Reg, indexed bool, l byte) {
 	rBit, xBit, bBit := byte(1), byte(1), byte(1) // inverted REX.R / REX.X / REX.B
 	if reg >= 8 {
@@ -426,20 +441,28 @@ func (a *Asm) YMovdqu(dst, src Reg) {
 	a.vex3RRReservedL(vexMap0F, 0b10, 0x6F, dst, src, 1)
 }
 
-func (a *Asm) YPaddb(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xFC, d, x, y, 1) }
-func (a *Asm) YPsubb(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xF8, d, x, y, 1) }
-func (a *Asm) YPaddw(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xFD, d, x, y, 1) }
-func (a *Asm) YPsubw(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xF9, d, x, y, 1) }
-func (a *Asm) YPmullw(d, x, y Reg) { a.vex3RRRMapL(vexMap0F, 0b01, 0xD5, d, x, y, 1) }
-func (a *Asm) YPaddd(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xFE, d, x, y, 1) }
-func (a *Asm) YPsubd(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xFA, d, x, y, 1) }
-func (a *Asm) YPmulld(d, x, y Reg) { a.vex3RRRMapL(vexMap0F38, 0b01, 0x40, d, x, y, 1) }
-func (a *Asm) YPaddq(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xD4, d, x, y, 1) }
-func (a *Asm) YPsubq(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xFB, d, x, y, 1) }
-func (a *Asm) YPand(d, x, y Reg)   { a.vex3RRRMapL(vexMap0F, 0b01, 0xDB, d, x, y, 1) }
-func (a *Asm) YPandn(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xDF, d, x, y, 1) }
-func (a *Asm) YPor(d, x, y Reg)    { a.vex3RRRMapL(vexMap0F, 0b01, 0xEB, d, x, y, 1) }
-func (a *Asm) YPxor(d, x, y Reg)   { a.vex3RRRMapL(vexMap0F, 0b01, 0xEF, d, x, y, 1) }
+func (a *Asm) YPaddb(d, x, y Reg)      { a.vex3RRRMapL(vexMap0F, 0b01, 0xFC, d, x, y, 1) }
+func (a *Asm) YPsubb(d, x, y Reg)      { a.vex3RRRMapL(vexMap0F, 0b01, 0xF8, d, x, y, 1) }
+func (a *Asm) YPaddw(d, x, y Reg)      { a.vex3RRRMapL(vexMap0F, 0b01, 0xFD, d, x, y, 1) }
+func (a *Asm) YPsubw(d, x, y Reg)      { a.vex3RRRMapL(vexMap0F, 0b01, 0xF9, d, x, y, 1) }
+func (a *Asm) YPmullw(d, x, y Reg)     { a.vex3RRRMapL(vexMap0F, 0b01, 0xD5, d, x, y, 1) }
+func (a *Asm) YPaddd(d, x, y Reg)      { a.vex3RRRMapL(vexMap0F, 0b01, 0xFE, d, x, y, 1) }
+func (a *Asm) YPsubd(d, x, y Reg)      { a.vex3RRRMapL(vexMap0F, 0b01, 0xFA, d, x, y, 1) }
+func (a *Asm) YPunpckldq(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 1, 0x62, d, x, y, 1) }
+func (a *Asm) YPunpckhdq(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 1, 0x6a, d, x, y, 1) }
+func (a *Asm) YPmulld(d, x, y Reg)     { a.vex3RRRMapL(vexMap0F38, 0b01, 0x40, d, x, y, 1) }
+func (a *Asm) YPsllvd(d, x, count Reg) { a.vex3RRRMapL(vexMap0F38, 1, 0x47, d, x, count, 1) }
+func (a *Asm) YPsrlvd(d, x, count Reg) { a.vex3RRRMapL(vexMap0F38, 1, 0x45, d, x, count, 1) }
+func (a *Asm) YBlendvps(d, x, y, mask Reg) {
+	a.vex3RRRMapL(vexMap0F3A, 1, 0x4a, d, x, y, 1)
+	a.B = append(a.B, byte(mask&15)<<4)
+}
+func (a *Asm) YPaddq(d, x, y Reg) { a.vex3RRRMapL(vexMap0F, 0b01, 0xD4, d, x, y, 1) }
+func (a *Asm) YPsubq(d, x, y Reg) { a.vex3RRRMapL(vexMap0F, 0b01, 0xFB, d, x, y, 1) }
+func (a *Asm) YPand(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xDB, d, x, y, 1) }
+func (a *Asm) YPandn(d, x, y Reg) { a.vex3RRRMapL(vexMap0F, 0b01, 0xDF, d, x, y, 1) }
+func (a *Asm) YPor(d, x, y Reg)   { a.vex3RRRMapL(vexMap0F, 0b01, 0xEB, d, x, y, 1) }
+func (a *Asm) YPxor(d, x, y Reg)  { a.vex3RRRMapL(vexMap0F, 0b01, 0xEF, d, x, y, 1) }
 func (a *Asm) YPcmpeqb(d, x, y Reg) {
 	a.vex3RRRMapL(vexMap0F, 0b01, 0x74, d, x, y, 1)
 }
@@ -448,6 +471,26 @@ func (a *Asm) YPmovmskb(dst, src Reg) {
 }
 func (a *Asm) YInsertI128(dst, src256, src128 Reg, lane byte) {
 	a.vex3RRIMapL(vexMap0F3A, 0b01, 0x38, dst, src256, src128, lane, 1)
+}
+
+func (a *Asm) YShufps(dst, x, y Reg, imm byte) {
+	a.vex3RRIMapL(vexMap0F, 0, 0xc6, dst, x, y, imm, 1)
+}
+
+func (a *Asm) YPermq(dst, src Reg, imm byte) {
+	a.vex3RRReservedWL(vexMap0F3A, 1, 0, dst, src, true, 1)
+	a.emit(imm)
+}
+
+// YExtractI128 writes an XMM destination; the YMM source occupies ModRM.reg.
+func (a *Asm) YExtractI128(dst, src Reg, lane byte) {
+	a.vex3RRReservedL(vexMap0F3A, 1, 0x39, src, dst, 1)
+	a.emit(lane)
+}
+
+// YPmovzxdq widens four unsigned dwords from XMM into four YMM qwords.
+func (a *Asm) YPmovzxdq(dst, src Reg) {
+	a.vex3RRReservedL(vexMap0F38, 1, 0x35, dst, src, 1)
 }
 func (a *Asm) YFPackedAdd(d, x, y Reg, f64 bool) {
 	a.vex3RRRMapL(vexMap0F, packedPP(f64), 0x58, d, x, y, 1)
@@ -683,6 +726,7 @@ func (a *Asm) vexShiftImmL(op, ext byte, dst, src Reg, imm, l byte) {
 }
 
 func (a *Asm) YPsrldImm(dst, src Reg, imm byte) { a.vexShiftDwordImmL(2, dst, src, imm, 1) }
+func (a *Asm) YPslldImm(dst, src Reg, imm byte) { a.vexShiftDwordImmL(6, dst, src, imm, 1) }
 func (a *Asm) YPsrlqImm(dst, src Reg, imm byte) { a.vexShiftQwordImmL(2, dst, src, imm, 1) }
 func (a *Asm) YPsllqImm(dst, src Reg, imm byte) { a.vexShiftQwordImmL(6, dst, src, imm, 1) }
 func (a *Asm) YPsrlwImm(dst, src Reg, imm byte) { a.vexShiftWordImmL(2, dst, src, imm, 1) }
@@ -924,6 +968,16 @@ func (a *Asm) VexMapRR(opcodeMap, pp, op byte, dst, src Reg) {
 // with a base+displacement memory source.
 func (a *Asm) VSseMemDisp(pp, op byte, dst, left, base Reg, disp int32) {
 	a.vex3MemDisp(vexMap0F, pp, op, dst, left, true, base, disp)
+}
+
+// VexMapRipPlaceholder emits a VEX.128 binary operation with a RIP-relative
+// read-only source. The returned displacement is patched by the literal pool.
+func (a *Asm) VexMapRipPlaceholder(opcodeMap, pp, op byte, dst, left Reg) int {
+	m := byte(vexMap0F)
+	if opcodeMap == 0x38 {
+		m = vexMap0F38
+	}
+	return a.vex3MemRipPlaceholder(m, pp, op, dst, left)
 }
 
 // MovdquDisp emits legacy MOVDQU with a base+displacement memory operand.

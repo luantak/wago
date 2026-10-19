@@ -873,6 +873,40 @@ func (a *Asm) AluRM(rmOpcode byte, dst, base Reg, disp int32, w bool) {
 	a.memOp(rmOpcode, byte(dst), base, disp, w)
 }
 
+// IncDecIdx updates a dword or qword memory operand by one, preserving CF.
+func (a *Asm) IncDecIdx(base, index Reg, disp int32, decrement, w bool) {
+	if w || index >= 8 || base >= 8 {
+		a.emit(a.rex(w, false, index >= 8, base >= 8))
+	}
+	a.emit(0xff)
+	digit := Reg(0)
+	if decrement {
+		digit = 1
+	}
+	a.sibAddr(digit, base, index, disp)
+}
+
+// AluImmIdx updates a dword or qword memory operand with a sign-extended
+// immediate. digit selects the x86 group-1 operation (ADD=0, OR=1, AND=4,
+// SUB=5, XOR=6). No general-purpose register is written.
+func (a *Asm) AluImmIdx(digit byte, base, index Reg, disp, imm int32, w bool) {
+	if w || index >= 8 || base >= 8 {
+		a.emit(a.rex(w, false, index >= 8, base >= 8))
+	}
+	short := int32(int8(imm)) == imm
+	if short {
+		a.emit(0x83)
+	} else {
+		a.emit(0x81)
+	}
+	a.sibAddr(Reg(digit), base, index, disp)
+	if short {
+		a.emit(byte(imm))
+	} else {
+		a.imm32(imm)
+	}
+}
+
 // AluIdx emits `dst = dst <op> [base + index + disp]` (reg,r/m form) — folding a
 // bounds-checked memory operand into an ALU op. rmOpcode is the reg,r/m opcode.
 func (a *Asm) AluIdx(rmOpcode byte, dst, base, index Reg, disp int32, w bool) {
@@ -1227,6 +1261,19 @@ func (a *Asm) LoadIdx(dst, base, index Reg, disp int32, size int, signed, wide b
 	a.sibAddr(dst, base, index, disp)
 }
 
+// LoadSigned32Scaled emits MOVSXD from [base + index*(1<<scaleLog) + disp].
+func (a *Asm) LoadSigned32Scaled(dst, base, index Reg, scaleLog byte, disp int32) {
+	if regallocCheckEnabled {
+		a.regallocGPWrite(regallocGPRegMask(dst))
+	}
+	mod := addrMode(base, disp)
+	a.recordAddress(base, mod)
+	a.emit(a.rex(true, dst >= 8, index >= 8, base >= 8), 0x63)
+	a.emit(mod | ((byte(dst) & 7) << 3) | 0x04)
+	a.emit((scaleLog << 6) | ((byte(index) & 7) << 3) | byte(base&7))
+	a.emitDisp(mod, disp)
+}
+
 func (a *Asm) StoreIdx(base, index, src Reg, disp int32, size int) {
 	if size == 2 {
 		a.emit(0x66) // operand-size prefix for 16-bit
@@ -1534,6 +1581,19 @@ func (a *Asm) KeepRel32Long(at int) {
 			return
 		}
 	}
+}
+
+// CmovccDisp selects a frame or otherwise proven-safe memory operand.
+func (a *Asm) CmovccDisp(cc Cond, dst, base Reg, disp int32, w bool) {
+	if regallocCheckEnabled {
+		a.regallocRead(base, disp, regallocWidth(w))
+		a.regallocGPWrite(regallocGPRegMask(dst))
+	}
+	if w || dst >= 8 || base >= 8 {
+		a.emit(a.rex(w, dst >= 8, false, base >= 8))
+	}
+	a.emit(0x0f, 0x40|byte(cc))
+	a.baseAddr(byte(dst), base, disp)
 }
 
 func (a *Asm) Cmovcc(cc Cond, dst, src Reg, w bool) {
