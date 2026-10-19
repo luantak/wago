@@ -366,6 +366,17 @@ func (fn *WasmFunc) Invoke(args ...uint64) ([]uint64, error) {
 					return out, err
 				}
 			}
+			if preparedScalarCombinedEnabled && fn.privateFast && !fn.isolatedFast && !fn.gcMaintenance && fn.in.rt == nil {
+				in := fn.in
+				state := in.ensurePluginState()
+				if in.tryBeginOrdinaryInvocation(state) {
+					if in.gc == nil && !in.guestStorageBorrowed() &&
+						in.executionFlags.Load()&(executionFlagImportedGCDomain|executionFlagDynamicGCDomain) == 0 {
+						return fn.invokeScalarCombinedAdmitted(args, state)
+					}
+					in.endOrdinaryInvocation(state)
+				}
+			}
 			return fn.invokeScalar(args)
 		}
 	}
@@ -667,6 +678,20 @@ func (fn *WasmFunc) invokeScalar(args []uint64) ([]uint64, error) {
 	preparedLease := in.lockPreparedInvocation()
 	defer preparedLease.unlock()
 	return fn.invokeScalarAdmitted(args)
+}
+
+func (fn *WasmFunc) invokeScalarCombinedAdmitted(args []uint64, state *instancePluginState) ([]uint64, error) {
+	state.invocationID = newInvocationID()
+	defer fn.in.endScalarCombinedInvocation(state)
+	return fn.invokeScalarAdmitted(args)
+}
+
+func (in *Instance) endScalarCombinedInvocation(state *instancePluginState) {
+	if in.importsFuncrefStorage() || in.table != nil {
+		in.reconcileFuncrefRoots()
+	}
+	state.invocationID = 0
+	in.endOrdinaryInvocation(state)
 }
 
 func (fn *WasmFunc) invokeScalarAdmitted(args []uint64) ([]uint64, error) {

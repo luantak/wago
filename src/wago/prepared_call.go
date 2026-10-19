@@ -16,6 +16,10 @@ var directPreparedCallEnabled = os.Getenv("WAGO_DIRECT_PREPARED") != "0"
 // benchmark comparisons.
 var preparedScalarFastEnabled = os.Getenv("WAGO_PREPARED_SCALAR_FAST") != "0"
 
+// Reuse the existing ordinary combined lifetime/gate admission for private
+// scalar handles. Keep the fallback for managed, revoked, borrowed, or GC state.
+var preparedScalarCombinedEnabled = os.Getenv("WAGO_PREPARED_SCALAR_COMBINED") == "1"
+
 // preparedPrivateEntryEnabled lets a WasmFunc with a private,
 // already-bound native context bypass the process-wide rebinding lease.
 // WAGO_PREPARED_PRIVATE_ENTRY=0 restores the ordinary entry path for A/B.
