@@ -6,6 +6,12 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ## [Unreleased]
 
+### Fixed
+
+- Allow up to 32 nested synchronous host calls under standard Go so component
+  adapter chains can cross more than four boundaries. TinyGo retains its
+  four-call limit for fixed host stacks.
+
 ### Changed
 
 - Prepare native reservations only when the active backend has a matching
