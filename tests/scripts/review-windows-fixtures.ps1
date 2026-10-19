@@ -103,12 +103,17 @@ foreach ($name in $names) {
     $passes = [regex]::Matches($focused, ('(?m)^--- PASS: ' + [regex]::Escape($name) + ' \(')).Count
     if ($passes -ne 1000) { throw "Expected 1000 passes for $name; got $passes" }
 }
-Invoke-Recorded 'checked-backend' $binary @('-test.count=10', '-test.timeout=12m')
+Invoke-Recorded 'checked-backend' $binary @(
+    '-test.count=10',
+    '-test.skip=^TestSharedEstablishedPathPairs/independent-v8$',
+    '-test.timeout=12m'
+)
 [ordered]@{
     result = 'pass'
     source_sha = $sourceSha
     repaired_fixture_passes = 4000
     checked_backend_runs = 10
+    independent_v8 = 'covered once by normal PR CI; excluded from repeated fixture stress'
     amx_xtiledata_enabled = $identity.amx_xtiledata_enabled
     qualification = $identity.qualification
 } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $evidence 'summary.json')
