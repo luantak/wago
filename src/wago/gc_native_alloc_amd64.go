@@ -11,12 +11,20 @@ import (
 var nativeStructAllocEnabled = os.Getenv("WAGO_AMD64_NO_GC_NATIVE_ALLOC") != "1"
 
 func (in *Instance) prepareNativeStructHandles(typeID uint32) {
+	in.prepareNativeStructHandlesMode(typeID, false)
+}
+
+func (in *Instance) prepareNativeDeadStructHandle(typeID uint32) {
+	in.prepareNativeStructHandlesMode(typeID, true)
+}
+
+func (in *Instance) prepareNativeStructHandlesMode(typeID uint32, dead bool) {
 	if !nativeStructAllocEnabled || in == nil || in.gc == nil || in.c == nil || int(typeID) >= len(in.c.Types) || int(typeID) >= len(in.c.GCTypeDescs) {
 		return
 	}
 	t := in.c.Types[typeID]
 	d := in.c.GCTypeDescs[typeID]
-	if !t.Final || t.Kind != CompositeTypeStruct || d.Kind != gc.KindStruct || len(t.Fields) != len(d.Fields) {
+	if t.Kind != CompositeTypeStruct || d.Kind != gc.KindStruct || len(t.Fields) != len(d.Fields) {
 		return
 	}
 	slots := 1 // trailing local type index
@@ -44,11 +52,23 @@ func (in *Instance) prepareNativeStructHandles(typeID uint32) {
 	}
 	size, err := gc.StructSize(d)
 	if err == nil {
-		in.gc.PrepareNativeStructAllocation(size)
+		if dead {
+			in.gc.PrepareNativeDeadStructAllocation(size)
+		} else {
+			in.gc.PrepareNativeStructAllocation(size)
+		}
 	}
 }
 
 func (in *Instance) prepareNativeArrayAllocation(typeID, length uint32) {
+	in.prepareNativeArrayAllocationMode(typeID, length, false)
+}
+
+func (in *Instance) prepareNativeDefaultArrayAllocation(typeID, length uint32) {
+	in.prepareNativeArrayAllocationMode(typeID, length, true)
+}
+
+func (in *Instance) prepareNativeArrayAllocationMode(typeID, length uint32, typedDefault bool) {
 	if !nativeStructAllocEnabled || in == nil || in.gc == nil || in.c == nil || int(typeID) >= len(in.c.Types) || int(typeID) >= len(in.c.GCTypeDescs) {
 		return
 	}
@@ -59,7 +79,7 @@ func (in *Instance) prepareNativeArrayAllocation(typeID, length uint32) {
 	}
 	if t.Array.Storage.Value.Kind == ValueTypeReference {
 		heap := t.Array.Storage.Value.Ref.Heap
-		if heap.Defined || (heap.Abstract != AbstractHeapAny && heap.Abstract != AbstractHeapEq) || (d.Elem != gc.StorageRef && d.Elem != gc.StorageRefNull) {
+		if (d.Elem != gc.StorageRef && d.Elem != gc.StorageRefNull) || (!typedDefault && (heap.Defined || (heap.Abstract != AbstractHeapAny && heap.Abstract != AbstractHeapEq))) {
 			return
 		}
 	}

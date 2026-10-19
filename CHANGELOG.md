@@ -6,6 +6,26 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ## [Unreleased]
 
+### Changed
+
+- Recycle zero-live AMD64 nursery identities in one batch while preserving
+  cleanup for owned storage and exact-capacity free lists.
+
+- Retain a checked AMD64 WasmGC object address across selected reads of other
+  objects, using a bounded compiler scan and the existing safety checks.
+
+- Keep ordinary AMD64 GC constructor selection and individual dead allocations
+  in the lean TinyGo build to meet the CLI size limit. Other builds retain the
+  specialized paths.
+
+- Require recompilation of cached native WasmGC artifacts after the native GC
+  ABI update to version 8.
+
+- Accelerate AMD64 WasmGC allocation, array operations, subtype casts, and
+  i31 round trips with specialized generated paths, bounded native-handle
+  batches, and survivor-aware nursery management. Preserve the existing Go
+  fallbacks and collector safety checks.
+
 ## [v0.1.0-beta.13] - 2026-10-15
 
 ### Changed
