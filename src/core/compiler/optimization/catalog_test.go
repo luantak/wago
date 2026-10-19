@@ -336,3 +336,67 @@ func assertPanics(t *testing.T, f func()) {
 	}()
 	f()
 }
+
+func TestResolveSnapshotFullPartialAndInvalidOverrides(t *testing.T) {
+	b, values, definitions := testBindings(t, "arm64", false)
+	b.entries[0].inverted = true
+	full := make(map[string]bool, len(definitions))
+	for i, d := range definitions {
+		full[d.Name] = i%2 == 0
+	}
+	for _, overrides := range []map[string]bool{nil, {definitions[0].Name: false}, full} {
+		s, err := b.ResolveSnapshot(overrides, Snapshot{}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, d := range definitions {
+			want := values[i] != b.entries[i].inverted
+			if override, ok := overrides[d.Name]; ok {
+				want = override
+			}
+			if got := s.Enabled(d.Name); got != want {
+				t.Fatalf("%s: enabled = %v, want %v", d.Name, got, want)
+			}
+		}
+	}
+	full["unknown-option"] = true
+	if _, err := b.ResolveSnapshot(full, Snapshot{}, nil); err == nil {
+		t.Fatal("unknown override accepted alongside the complete catalog")
+	}
+	if values[0] {
+		t.Fatal("resolution changed process defaults")
+	}
+}
+
+func TestCatalogArchitectureSlicesAreOwnedByCaller(t *testing.T) {
+	readers := map[string]func() []Definition{
+		"all":          All,
+		"architecture": func() []Definition { return ForArch("amd64") },
+		"lookup": func() []Definition {
+			d, ok := Lookup("amd64", "reg-abi")
+			if !ok {
+				t.Fatal("missing reg-abi")
+			}
+			return []Definition{d}
+		},
+	}
+	for name, read := range readers {
+		t.Run(name, func(t *testing.T) {
+			definitions := read()
+			for i := range definitions {
+				definitions[i].Architectures[0] = "changed"
+			}
+			for _, optimization := range []string{"reg-abi", "inline"} {
+				d, ok := Lookup("amd64", optimization)
+				if !ok || len(d.Architectures) != 2 || d.Architectures[0] != "amd64" || d.Architectures[1] != "arm64" {
+					t.Fatalf("catalog changed after caller mutation: %#v", d)
+				}
+			}
+			for _, d := range read() {
+				if d.Architectures[0] == "changed" {
+					t.Fatalf("caller mutation persisted for %s", d.Name)
+				}
+			}
+		})
+	}
+}

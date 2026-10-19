@@ -34,6 +34,8 @@ import (
 var regMergeEnabled = os.Getenv("WAGO_REG_MERGE") != "0"
 
 // Binding-time Go classification permits direct control-frame calls in bounded numeric functions.
+var nativeLeafHostEnabled = os.Getenv("WAGO_AMD64_NO_NATIVE_LEAF_HOST") != "1"
+
 var directGoImportEnabled = os.Getenv("WAGO_AMD64_NO_DIRECT_GO_IMPORT") != "1"
 
 // Lend R11 to guarded call-making local pins. The second lease below can
@@ -413,7 +415,8 @@ type fn struct {
 	canonicalI32Uses        uint8  // saturated eligible uses; first two retain conservative code
 	hasJumpTableData        bool   // typed embedded data is remapped, but branches retain fixed widths
 
-	// memSizeReg caches the linear-memory size in bytes ([RBX-bdCurBytes]) in a
+	// memSizeReg caches the ordinary linear-memory size in bytes, or the stable
+	// backing base for shared memory when shared-memory-base is enabled, in a
 	// dedicated register for the whole module (WARP's REGS::memSize, which reserves
 	// RSI when bounds checks are on). regNone in guard mode or when the module has
 	// no memory. wago's ABI keeps RSI busy at every call boundary (trap/linMem), so
@@ -3575,7 +3578,7 @@ func compileFuncAttempt(m *wasm.Module, gcTypeLayouts []codegen.GCTypeLayout, fu
 	f.gcTypeSubtypingRefTest = gcTypeSubtypingRefTest
 	f.gcStructHelpers = gcStructHelpers
 	f.gcArrayHelpers = gcArrayHelpers
-	if !guardMode && len(m.Memories) > 0 {
+	if f.threadedMemory0 && f.opt(optSharedMemoryBase) || !guardMode && len(m.Memories) > 0 {
 		f.memSizeReg = R15 // explicit bounds: R15 = memBytes for the whole module
 	}
 	if cap(f.localType) < nLocals {
@@ -3662,7 +3665,7 @@ func compileFuncAttempt(m *wasm.Module, gcTypeLayouts []codegen.GCTypeLayout, fu
 		f.stats.peep("all-calls-inlined")
 	}
 	regABI := f.opt(optRegABI) && (sigFitsRegABI(ft) || (f.stagedTailDescriptors && sigFitsReferenceResultRegABI(ft)))
-	if f.opt(optMemSizeRegionalLease) && f.memSizeReg != regNone && pinLocals && regABI &&
+	if !f.threadedMemory0 && f.opt(optMemSizeRegionalLease) && f.memSizeReg != regNone && pinLocals && regABI &&
 		hints.flags.has(hintIntervalRegionStorage) && !hasCall &&
 		!hints.flags.has(hintHasControlFlow|hintUsesBulkMem) && len(inlinedCallees) == 0 {
 		f.memSizeReg = regNone
@@ -3704,9 +3707,13 @@ func compileFuncAttempt(m *wasm.Module, gcTypeLayouts []codegen.GCTypeLayout, fu
 	// generated code is constrained to caller-saved GPRs. Reserve every Go
 	// callee-saved allocatable register up front; RBX remains the explicit linMem
 	// input. The body/local bounds keep any spill tradeoff away from larger code.
-	directPrepared := f.opt(optPreparedDirectEntry) && regABI && (preparedDirectIntSig(ft) || preparedDirectFloatSupported && (preparedDirectFloatSig(ft) || preparedDirectMixedSig(ft))) && (!hasCall || hints.hasNonDirectCall()) && !touchesMemory && len(modGlobals) == 0 && !moduleEH && !hints.hasUnsupportedDynamicCall() &&
+	// Register preservation is independent of scheduler admission. Keep this
+	// allocation constraint when bounded entry is disabled; the finalizer drops
+	// the direct-entry proof without changing the guest body.
+	nativeHostDirect := coreruntime.NativeScalarLeafSupported && f.opt(optNativeLeafHost) && m.ImportedFuncCount() == 1 && shared.BoundedNativeHostBody(c.BodyBytes, 1)
+	directPrepared := f.opt(optPreparedDirectEntry) && regABI && (preparedDirectIntSig(ft) || preparedDirectFloatSupported && (preparedDirectFloatSig(ft) || preparedDirectMixedSig(ft))) && (!hasCall || hints.hasNonDirectCall() || nativeHostDirect) && !touchesMemory && len(modGlobals) == 0 && !moduleEH && (!hints.hasUnsupportedDynamicCall() || nativeHostDirect) &&
 		(!hasCall || len(gcTypeLayouts) == 0 && !gcTypeSubtypingRefTest && !gcStructHelpers && !gcArrayHelpers && gcFrameRoots == nil) &&
-		m.ImportedFuncCount() == 0 && (m.MemCount() == 0 || !hasCall) && len(c.BodyBytes) <= 96 && nLocals <= 8
+		((m.ImportedFuncCount() == 0 && (m.MemCount() == 0 || !hasCall)) || nativeHostDirect) && len(c.BodyBytes) <= 96 && nLocals <= 8
 	if directPrepared {
 		for _, r := range [...]Reg{RBP, R12, R13, R14, R15} {
 			gpPool = withoutReg(gpPool, r)
@@ -4569,7 +4576,7 @@ func (f *fn) prologue(localScores []uint32) {
 	if f.memSizeReg != regNone {
 		// Offset-0 entry: establish the module-wide memBytes cache. Direct wasm→wasm
 		// register-ABI calls skip this (the caller's value is valid by construction).
-		a.Load64(f.memSizeReg, RBX, -bdCurBytes)
+		f.loadMemoryCache()
 	}
 	f.emitStackFenceCheck(RBX, RAX)
 	f.emitInterruptCheck(RAX) // RAX still free: params load below
@@ -4714,7 +4721,7 @@ func (f *fn) emitRegABI(c *wasm.Func, hostAdapter, hasFloatConst, hasSIMD bool, 
 		if f.memSizeReg != regNone {
 			// Offset-0 entry (from Go, or an indirect call): establish the module-wide
 			// memBytes cache before the internal entry runs (which relies on it).
-			a.Load64(f.memSizeReg, RBX, -bdCurBytes)
+			f.loadMemoryCache()
 		}
 		f.deriveModuleGlobals() // offset-0 entry: cells → module-pinned registers
 		a.Push(RCX)             // results ptr (also keeps RSP 16-aligned at the internal call)

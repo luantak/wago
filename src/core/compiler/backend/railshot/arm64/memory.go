@@ -3,6 +3,7 @@
 package arm64
 
 import (
+	"github.com/wago-org/wago/src/core/compiler/backend/railshot/shared"
 	"github.com/wago-org/wago/src/core/compiler/wasm"
 
 	a64 "github.com/wago-org/wago/src/core/encoder/arm64"
@@ -463,16 +464,28 @@ func sortTrapSitesByFunction(sites []trapSite) {
 // bounds check (unless guard permits elision), and returns the register
 // holding the effective offset plus the displacement to fold into the access.
 // aliasPinned lets a pinned-local address be used in place (no copy) — only
-// valid when the access is emitted immediately (stores), not deferred (loads);
+// valid for immediate stores and loads that publish a tracked borrowed memRef;
 // eaOwned reports whether the caller must release ea. Passing guard=false
 // requires a full-access bounds proof even in a guard-page function.
 func (f *fn) memAddr(off uint64, size int, aliasPinned bool, rangeExtent int32, guard bool) (ea Reg, eaOwned bool, borrow int, disp int32) {
+	if !guard && f.boundsFacts && f.staticallyInBounds(off, size) {
+		guard = true
+		f.stats.peep("static-bounds-elide")
+	}
+	minimumAccess := !guard && !f.memoryAddr64(0) && f.minimumMemoryAccess(0, off, size)
 	f.materializePendingTraps()
 	if f.memoryAddr64(0) {
 		return f.memAddr64(off, size)
 	}
 	off32 := uint32(off)
-	e := f.popValue()
+	addressPins := f.pinned
+	var e *elem
+	addressLoan := false
+	if f.opt(optRegionalMemoryRead) && len(f.intervalLast) != 0 && aliasPinned && int64(off32)+int64(size) <= 0x7fffffff {
+		e, addressLoan = f.popRegionalMemoryAddress()
+	} else {
+		e = f.popValue()
+	}
 	// Do not infer this from the Wasm i32 type alone: serialized parameters and
 	// other external carriers may have non-canonical upper bits. Constants are
 	// materialized with a W-register move; the fact is set only by producers
@@ -529,7 +542,13 @@ func (f *fn) memAddr(off uint64, size int, aliasPinned bool, rangeExtent int32, 
 		f.release(t)
 	}
 
-	if guard {
+	if guard || minimumAccess {
+		if minimumAccess {
+			f.stats.peep("memory-min-bounds")
+		}
+		if addressLoan {
+			f.pinned = addressPins
+		}
 		return ea, eaOwned, borrow, disp
 	}
 	// P6.1 straight-line bounds-check elision: skip the check when a prior
@@ -540,6 +559,9 @@ func (f *fn) memAddr(off uint64, size int, aliasPinned bool, rangeExtent int32, 
 	// on every path. WAGO_NO_BOUNDS_FACTS=1 forces every check (A/B + kill switch).
 	if f.boundsFacts && f.boundsCertCovers(bcKind, bcIdx, leaDisp) {
 		f.stats.addBoundsElidable()
+		if addressLoan {
+			f.pinned = addressPins
+		}
 		return ea, eaOwned, borrow, disp
 	}
 	if rangeExtent > leaDisp {
@@ -563,6 +585,9 @@ func (f *fn) memAddr(off uint64, size int, aliasPinned bool, rangeExtent int32, 
 		// this function's cold tail instead of shifting the rest of the module.
 		f.phasePadWords++
 		f.pinned = f.pinned.remove(ea)
+		if addressLoan {
+			f.pinned = addressPins
+		}
 		return ea, eaOwned, borrow, disp
 	}
 	t := f.allocReg(0)
@@ -578,6 +603,9 @@ func (f *fn) memAddr(off uint64, size int, aliasPinned bool, rangeExtent int32, 
 	f.trapIf(condA, trapMemOOB) // out of bounds when ea+off+size > memBytes
 	f.release(t)
 	f.pinned = f.pinned.remove(ea)
+	if addressLoan {
+		f.pinned = addressPins
+	}
 	return ea, eaOwned, borrow, disp
 }
 
@@ -585,6 +613,7 @@ func (f *fn) memAddr(off uint64, size int, aliasPinned bool, rangeExtent int32, 
 // staged memory64 allocation remains bounded to 65,535 pages, but neither u64
 // addition may wrap into that range.
 func (f *fn) memAddr64(off uint64, size int) (ea Reg, eaOwned bool, borrow int, disp int32) {
+	minimumAccess := f.minimumMemoryAccess(0, off, size)
 	f.materializePendingTraps()
 	e := f.popValue()
 	ea, eaOwned = f.materialize(e), true
@@ -592,9 +621,17 @@ func (f *fn) memAddr64(off uint64, size int) (ea Reg, eaOwned bool, borrow int, 
 	if off != 0 {
 		t := f.allocReg(maskOf(ea))
 		f.a.MovImm64(t, off)
-		f.a.Adds64(ea, ea, t)
-		f.trapIf(condAE, trapMemOOB) // carry set
+		if minimumAccess {
+			f.a.Add64(ea, ea, t)
+		} else {
+			f.a.Adds64(ea, ea, t)
+			f.trapIf(condAE, trapMemOOB)
+		} // carry set
 		f.release(t)
+	}
+	if minimumAccess {
+		f.stats.peep("memory-min-bounds")
+		return ea, eaOwned, borrow, disp
 	}
 	f.pinned = f.pinned.add(ea)
 	end := f.allocReg(maskOf(ea))
@@ -637,7 +674,7 @@ func (f *fn) readMemArg(r *wasm.Reader) (memoryIndex uint32, off uint64, err err
 }
 
 func (f *fn) memAddrAt(memoryIndex uint32, off uint64, size int) (base, ea Reg, releaseBase, eaOwned bool, borrow int, disp int32) {
-	if memoryIndex == 0 {
+	if memoryIndex == 0 && !f.threadedMemory0 {
 		ea, eaOwned, borrow, disp = f.memAddr(off, size, true, 0, f.guardMode)
 		return linMemReg, ea, false, eaOwned, borrow, disp
 	}
@@ -646,6 +683,7 @@ func (f *fn) memAddrAt(memoryIndex uint32, off uint64, size int) (base, ea Reg, 
 }
 
 func (f *fn) indexedMemAddr(memoryIndex uint32, off uint64, size int) (base, ea Reg, disp int32) {
+	minimumAccess := f.minimumMemoryAccess(memoryIndex, off, size)
 	f.materializePendingTraps()
 	e := f.popValue()
 	loadDefinedLocal := f.loadDefinedAddressLocal(e)
@@ -663,18 +701,46 @@ func (f *fn) indexedMemAddr(memoryIndex uint32, off uint64, size int) (base, ea 
 	if off != 0 {
 		t := f.allocReg(maskOf(ea))
 		f.a.MovImm64(t, off)
-		f.a.Adds64(ea, ea, t)
-		f.trapIf(condAE, trapMemOOB)
+		if minimumAccess {
+			f.a.Add64(ea, ea, t)
+		} else {
+			f.a.Adds64(ea, ea, t)
+			f.trapIf(condAE, trapMemOOB)
+		}
 		f.release(t)
 	}
+	if minimumAccess {
+		base = f.allocReg(maskOf(ea))
+		if memoryIndex == 0 && f.cachedSharedMemoryBase() != regNone {
+			f.a.MovReg64(base, f.cachedSharedMemoryBase())
+		} else {
+			f.ld64(base, linMemReg, -int32(offMemoryDirPtr))
+			f.ld64(base, base, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirBaseOffset)
+		}
+		f.stats.peep("memory-min-bounds")
+		return base, ea, disp
+	}
 	f.pinned = f.pinned.add(ea)
-	dir := f.allocReg(maskOf(ea))
-	f.ld64(dir, linMemReg, -int32(offMemoryDirPtr))
-	entry := int32(memoryIndex) * abi.MemoryDirEntryBytes
-	mb := f.allocReg(maskOf(ea, dir))
-	f.ld64(mb, dir, entry+abi.MemoryDirCurrentBytesOffset)
-	base = f.allocReg(maskOf(ea, dir, mb))
-	f.ld64(base, dir, entry+abi.MemoryDirBaseOffset)
+	dir := regNone
+	mb := regNone
+	if memoryIndex == 0 && f.cachedSharedMemoryBase() != regNone {
+		base = f.allocReg(maskOf(ea))
+		f.a.MovReg64(base, f.cachedSharedMemoryBase())
+		mb = f.allocReg(maskOf(ea, base))
+		f.loadSharedMemoryBytes(mb, base)
+	} else {
+		dir = f.allocReg(maskOf(ea))
+		f.ld64(dir, linMemReg, -int32(offMemoryDirPtr))
+		entry := int32(memoryIndex) * abi.MemoryDirEntryBytes
+		mb = f.allocReg(maskOf(ea, dir))
+		base = f.allocReg(maskOf(ea, dir, mb))
+		f.ld64(base, dir, entry+abi.MemoryDirBaseOffset)
+		if f.memoryShared(memoryIndex) {
+			f.loadSharedMemoryBytes(mb, base)
+		} else {
+			f.ld64(mb, base, -int32(bdCurBytes))
+		}
+	}
 	end := f.allocReg(maskOf(ea, dir, mb, base))
 	f.a.MovImm64(end, uint64(size))
 	f.a.Adds64(end, ea, end)
@@ -683,7 +749,9 @@ func (f *fn) indexedMemAddr(memoryIndex uint32, off uint64, size int) (base, ea 
 	f.trapIf(condA, trapMemOOB)
 	f.release(end)
 	f.release(mb)
-	f.release(dir)
+	if dir != regNone {
+		f.release(dir)
+	}
 	f.pinned = f.pinned.remove(ea)
 	return base, ea, disp
 }
@@ -901,7 +969,7 @@ func (f *fn) memLoad(r *wasm.Reader, size int, signed, wide bool) error {
 	if err != nil {
 		return err
 	}
-	if memoryIndex != 0 {
+	if memoryIndex != 0 || f.threadedMemory0 {
 		f.invalidateStoreForward()
 		base, ea, disp := f.indexedMemAddr(memoryIndex, off, size)
 		out := f.allocReg(maskOf(base, ea))
@@ -1035,17 +1103,29 @@ func (f *fn) memStore(r *wasm.Reader, size int) error {
 	if err != nil {
 		return err
 	}
-	if memoryIndex != 0 {
+	if memoryIndex != 0 || f.threadedMemory0 {
 		f.materializePendingLoads()
 		f.invalidateStoreForward()
-		value := f.materialize(f.popValue())
+		stored := f.popValue()
+		typ := stored.st.typ
+		value := f.materialize(stored)
 		f.pinned = f.pinned.add(value)
+		loadEnd, forward := f.inspectFixedSharedStoredLoad(r, memoryIndex, off, size, typ)
 		base, ea, disp := f.indexedMemAddr(memoryIndex, off, size)
 		f.a.StoreIdx(base, ea, value, disp, size)
 		f.release(base)
 		f.release(ea)
 		f.pinned = f.pinned.remove(value)
-		f.release(value)
+		if forward {
+			if err := r.JumpTo(loadEnd); err != nil {
+				return err
+			}
+			f.a.MovReg32(value, value)
+			f.pushReg(value, typ)
+			f.stats.peep("fixed-shared-store-load-fwd")
+		} else {
+			f.release(value)
+		}
 		return nil
 	}
 	// Do this before evaluating store operands; the alias-aware load pass below
@@ -1438,10 +1518,8 @@ func (f *fn) fillLoop(dst, pat, n Reg) {
 	f.cmpImm(n, 64, true)
 	wideTail := f.a.Bcond(condB)
 	wideLoop := f.a.Len()
-	f.a.StrQ(dst, 0, vec)
-	f.a.StrQ(dst, 16, vec)
-	f.a.StrQ(dst, 32, vec)
-	f.a.StrQ(dst, 48, vec)
+	f.a.StpQ(vec, vec, dst, 0)
+	f.a.StpQ(vec, vec, dst, 32)
 	f.a.AddImm64(dst, dst, 64)
 	f.a.SubImm64(n, n, 64)
 	f.cmpImm(n, 64, true)
@@ -1449,8 +1527,7 @@ func (f *fn) fillLoop(dst, pat, n Reg) {
 	f.patchBranch19(wideTail, f.a.Len())
 	f.cmpImm(n, 32, true)
 	vecTail := f.a.Bcond(condB)
-	f.a.StrQ(dst, 0, vec)
-	f.a.StrQ(dst, 16, vec)
+	f.a.StpQ(vec, vec, dst, 0)
 	f.a.AddImm64(dst, dst, 32)
 	f.a.SubImm64(n, n, 32)
 	f.patchBranch19(vecTail, f.a.Len())
@@ -1488,6 +1565,14 @@ func (f *fn) memoryInit(r *wasm.Reader) error {
 	if err != nil {
 		return err
 	}
+	if memoryIndex == 0 && f.threadedMemory0 {
+		if top := f.s.back(); top != nil && top.elemKind() == ekValue && top.st.kind == stConst {
+			if n := uint32(top.st.cval); n <= 64 {
+				f.memoryInitConst(dataIdx, int(n))
+				return nil
+			}
+		}
+	}
 	f.materializePendingLoads()
 	f.flush()
 	d := f.depth()
@@ -1516,6 +1601,84 @@ func (f *fn) memoryInit(r *wasm.Reader) error {
 
 	f.setDepth(d - 3)
 	return nil
+}
+
+// memoryInitConst retains live values in their allocated registers instead of
+// flushing the entire operand stack. Both checks precede all destination writes.
+func (f *fn) memoryInitConst(dataIdx uint32, n int) {
+	f.stats.peep("meminit-unroll")
+	f.materializePendingLoads()
+	f.erase(f.s.back())
+	callerPins := f.pinned
+	src := f.materialize(f.popValue())
+	f.pinned = f.pinned.add(src)
+	dst := f.materialize(f.popValue())
+	f.pinned = f.pinned.add(dst)
+	f.a.MovReg32(src, src)
+	if !f.memoryAddr64(0) {
+		f.a.MovReg32(dst, dst)
+	}
+	f.bulkBoundsCheck(dst, n, 0)
+	desc := f.allocReg(maskOf(src, dst))
+	f.pinned = f.pinned.add(desc)
+	f.ld64(desc, linMemReg, -int32(offPassiveDataPtr))
+	length := f.allocReg(maskOf(src, dst, desc))
+	f.pinned = f.pinned.add(length)
+	f.ld32(length, desc, int32(dataIdx)*16+8)
+	end := f.allocReg(maskOf(src, dst, desc, length))
+	f.leaDisp(end, src, int32(n), true)
+	f.trapUnlessLE(end, length)
+	f.release(end)
+	f.pinned = f.pinned.remove(length)
+	f.release(length)
+	if n != 0 {
+		base, owned := f.indexedMemoryBase(0, maskOf(src, dst, desc))
+		f.a.Add64(dst, dst, base)
+		if owned {
+			f.release(base)
+		}
+		f.ld64(desc, desc, int32(dataIdx)*16)
+		f.a.Add64(src, src, desc)
+	}
+	f.pinned = f.pinned.remove(desc)
+	f.release(desc)
+	off := 0
+	if n >= 16 {
+		vec := f.allocFReg(0)
+		for ; off+16 <= n; off += 16 {
+			f.a.LdrQ(vec, src, int32(off))
+			f.a.StrQ(dst, int32(off), vec)
+		}
+		f.releaseF(vec)
+	}
+	if off < n {
+		scratch := f.allocReg(maskOf(src, dst))
+		for off < n {
+			size := 8
+			for size > n-off {
+				size >>= 1
+			}
+			switch size {
+			case 8:
+				f.a.Load64(scratch, src, uint32(off))
+				f.a.Store64(scratch, dst, uint32(off))
+			case 4:
+				f.a.Load32(scratch, src, uint32(off))
+				f.a.Store32(scratch, dst, uint32(off))
+			case 2:
+				f.a.Ldrh(scratch, src, uint32(off))
+				f.a.Strh(scratch, dst, uint32(off))
+			case 1:
+				f.a.Ldrb(scratch, src, uint32(off))
+				f.a.Strb(scratch, dst, uint32(off))
+			}
+			off += size
+		}
+		f.release(scratch)
+	}
+	f.pinned = callerPins
+	f.release(src)
+	f.release(dst)
 }
 
 // dataDrop lowers data.drop by setting the passive segment descriptor length to
@@ -1761,19 +1924,91 @@ func (f *fn) memoryFill(r *wasm.Reader) error {
 	return nil
 }
 
+var sharedMemoryBaseEnabled = true
+
+// The register is reserved module-wide and established at every wrapper entry.
+// Growth cannot relocate the reservation; helper/cross-context continuations
+// reestablish it from the restored instance's private directory.
+func (f *fn) cachedSharedMemoryBase() Reg {
+	if f.threadedMemory0 && f.memSizeReg == X27 && f.opt(optSharedMemoryBase) {
+		return f.memSizeReg
+	}
+	return regNone
+}
+
+func (f *fn) loadMemoryCache() {
+	if f.cachedSharedMemoryBase() != regNone {
+		f.ld64(f.memSizeReg, linMemReg, -int32(offMemoryDirPtr))
+		f.ld64(f.memSizeReg, f.memSizeReg, abi.MemoryDirBaseOffset)
+	} else {
+		f.ld64(f.memSizeReg, linMemReg, -int32(bdCurBytes))
+	}
+}
+
+// loadSharedMemoryBytes acquires the backing's authoritative size, rather
+// than an instance directory snapshot that another grower can make stale.
+func (f *fn) loadSharedMemoryBytes(dst, base Reg) {
+	f.a.SubImm64(dst, base, uint32(bdCurBytes))
+	f.a.Ldar(dst, dst, 8)
+}
+
+func (f *fn) sharedMemorySize(memoryIndex uint32) {
+	out := f.allocReg(0)
+	if base := f.cachedSharedMemoryBase(); memoryIndex == 0 && base != regNone {
+		f.loadSharedMemoryBytes(out, base)
+	} else {
+		f.ld64(out, linMemReg, -int32(offMemoryDirPtr))
+		f.ld64(out, out, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirBaseOffset)
+		f.loadSharedMemoryBytes(out, out)
+	}
+	f.a.LsrImm(out, out, 16, false)
+	if f.memoryAddr64(memoryIndex) {
+		f.pushReg(out, mtI64)
+	} else {
+		f.pushReg(out, mtI32)
+	}
+}
+
+func (f *fn) sharedMemoryGrow(memoryIndex uint32) error {
+	f.materializePendingLoads()
+	f.materializePendingTraps()
+	f.invalidateBoundsCert()
+	if top := f.s.back(); top != nil && top.elemKind() == ekValue && top.st.kind == stConst && (top.st.cval == 0 || !f.memoryAddr64(memoryIndex) && uint32(top.st.cval) == 0) {
+		f.dropValue()
+		f.sharedMemorySize(memoryIndex)
+		return nil
+	}
+	typ := wasm.I32
+	if f.memoryAddr64(memoryIndex) {
+		typ = wasm.I64
+	}
+	params := []wasm.ValType{typ}
+	if memoryIndex != 0 {
+		params = append(params, wasm.I32)
+		f.pushValue(storage{kind: stConst, typ: mtI32, cval: int64(memoryIndex)})
+	}
+	ft := &wasm.CompType{Kind: wasm.CompFunc, Params: params, Results: []wasm.ValType{typ}}
+	return f.callHostSync(int(shared.AtomicWaitDispatchBit|shared.AtomicHelperMemoryGrow), ft)
+}
+
 // memorySize pushes the current linear-memory size in pages.
 func (f *fn) memorySize(r *wasm.Reader) error {
 	memoryIndex, err := r.U32()
 	if err != nil {
 		return err
 	}
+	if f.memoryShared(memoryIndex) {
+		f.sharedMemorySize(memoryIndex)
+		return nil
+	}
 	out := f.allocReg(0)
-	if memoryIndex == 0 {
+	if memoryIndex == 0 && !f.threadedMemory0 {
 		f.ld32(out, linMemReg, -int32(bdCurPages))
 	} else {
 		dir := f.allocReg(maskOf(out))
 		f.ld64(dir, linMemReg, -int32(offMemoryDirPtr))
-		f.ld32(out, dir, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirCurrentPagesOffset)
+		f.ld64(dir, dir, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirBaseOffset)
+		f.ld32(out, dir, -int32(bdCurPages))
 		f.release(dir)
 	}
 	if f.memoryAddr64(memoryIndex) {
@@ -1791,6 +2026,9 @@ func (f *fn) memoryGrow(r *wasm.Reader) error {
 	memoryIndex, err := r.U32()
 	if err != nil {
 		return err
+	}
+	if f.memoryShared(memoryIndex) {
+		return f.sharedMemoryGrow(memoryIndex)
 	}
 	f.materializePendingTraps()
 	f.invalidateBoundsCert()
@@ -1859,6 +2097,13 @@ func (f *fn) memoryGrow(r *wasm.Reader) error {
 		// The successful path already has the new byte size in nw. Forward it to
 		// the regional bounds cache instead of reloading the value just stored.
 		f.a.MovReg64(f.memSizeReg, nw)
+	} else if f.memSizeReg != regNone {
+		// A nonzero import can alias memory zero; distinct memories must keep
+		// their own primary bound rather than forwarding the grown size.
+		// Shared primary memory caches its backing address instead of a size.
+		f.loadMemoryCache()
+	}
+	if f.memSizeReg != regNone {
 		if f.memLimitReg != regNone {
 			f.a.SubImm64(f.memLimitReg, f.memSizeReg, uint32(f.memLimitExtent))
 		}
@@ -1938,7 +2183,7 @@ func (f *fn) memoryAddr64(memoryIndex uint32) bool {
 func (f *fn) absoluteBulkAddr(memoryIndex uint32, offset, n Reg) {
 	f.a.Adds64(X12, offset, n)
 	f.trapIf(condAE, trapMemOOB)
-	if memoryIndex == 0 {
+	if memoryIndex == 0 && !f.threadedMemory0 {
 		mb := f.memSizeReg
 		if mb == regNone {
 			mb = X13
@@ -1949,9 +2194,22 @@ func (f *fn) absoluteBulkAddr(memoryIndex uint32, offset, n Reg) {
 		f.a.Add64(offset, offset, linMemReg)
 		return
 	}
+	if memoryIndex == 0 && f.cachedSharedMemoryBase() != regNone {
+		f.loadSharedMemoryBytes(X16, f.cachedSharedMemoryBase())
+		f.cmpRR(X12, X16, true)
+		f.trapIf(condA, trapMemOOB)
+		f.a.Add64(offset, offset, f.cachedSharedMemoryBase())
+		return
+	}
 	f.ld64(X13, linMemReg, -int32(offMemoryDirPtr))
 	entry := int32(memoryIndex) * abi.MemoryDirEntryBytes
-	f.ld64(X16, X13, entry+abi.MemoryDirCurrentBytesOffset)
+	if f.memoryShared(memoryIndex) {
+		f.ld64(X16, X13, entry+abi.MemoryDirBaseOffset)
+		f.loadSharedMemoryBytes(X16, X16)
+	} else {
+		f.ld64(X16, X13, entry+abi.MemoryDirBaseOffset)
+		f.ld64(X16, X16, -int32(bdCurBytes))
+	}
 	f.cmpRR(X12, X16, true)
 	f.trapIf(condA, trapMemOOB)
 	f.ld64(X12, X13, entry)
@@ -1982,15 +2240,26 @@ func (f *fn) bulkBoundsCheck(base Reg, n int, memoryIndex uint32) {
 	} else {
 		f.leaDisp(t, base, int32(n), true)
 	}
-	if memoryIndex == 0 && f.memSizeReg != regNone {
+	if memoryIndex == 0 && !f.threadedMemory0 && f.memSizeReg != regNone {
 		f.cmpRR(t, f.memSizeReg, true)
+	} else if memoryIndex == 0 && f.cachedSharedMemoryBase() != regNone {
+		mb := f.allocReg(maskOf(t))
+		f.loadSharedMemoryBytes(mb, f.cachedSharedMemoryBase())
+		f.cmpRR(t, mb, true)
+		f.release(mb)
 	} else {
 		mb := f.allocReg(maskOf(t))
-		if memoryIndex == 0 {
+		if memoryIndex == 0 && !f.threadedMemory0 {
 			f.ld64(mb, linMemReg, -int32(bdCurBytes))
 		} else {
 			f.ld64(mb, linMemReg, -int32(offMemoryDirPtr))
-			f.ld64(mb, mb, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirCurrentBytesOffset)
+			if f.memoryShared(memoryIndex) {
+				f.ld64(mb, mb, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirBaseOffset)
+				f.loadSharedMemoryBytes(mb, mb)
+			} else {
+				f.ld64(mb, mb, int32(memoryIndex)*abi.MemoryDirEntryBytes+abi.MemoryDirBaseOffset)
+				f.ld64(mb, mb, -int32(bdCurBytes))
+			}
 		}
 		f.cmpRR(t, mb, true)
 		f.release(mb)
@@ -2003,8 +2272,11 @@ func (f *fn) bulkBoundsCheck(base Reg, n int, memoryIndex uint32) {
 }
 
 func (f *fn) indexedMemoryBase(memoryIndex uint32, avoid regMask) (Reg, bool) {
-	if memoryIndex == 0 {
+	if memoryIndex == 0 && !f.threadedMemory0 {
 		return linMemReg, false
+	}
+	if memoryIndex == 0 && f.cachedSharedMemoryBase() != regNone {
+		return f.cachedSharedMemoryBase(), false
 	}
 	dir := f.allocReg(avoid)
 	f.ld64(dir, linMemReg, -int32(offMemoryDirPtr))
@@ -2017,6 +2289,10 @@ func (f *fn) indexedMemoryBase(memoryIndex uint32, avoid regMask) (Reg, bool) {
 // memoryFillConst lowers memory.fill with a small constant length as unrolled
 // stores of a byte-replicated pattern — no flush, no fill-loop startup.
 func (f *fn) memoryFillConst(n int, memoryIndex uint32) {
+	if n >= 16 && f.opt(optBulkFillVector) {
+		f.memoryFillVector(n, memoryIndex)
+		return
+	}
 	f.stats.peep("memfill-unroll")
 	f.materializePendingLoads() // pending loads must read pre-fill memory
 	f.erase(f.s.back())         // n (const)
@@ -2037,11 +2313,16 @@ func (f *fn) memoryFillConst(n int, memoryIndex uint32) {
 		}
 		f.pinned = f.pinned.add(pat)
 	}
+	minimumAccess := f.minimumMemoryAccess(memoryIndex, 0, n)
 	dst, dstOwned := f.materializeRead(f.popValue())
 	if !f.memoryAddr64(memoryIndex) {
 		f.a.MovReg32(dst, dst)
 	}
-	f.bulkBoundsCheck(dst, n, memoryIndex)
+	if minimumAccess {
+		f.stats.peep("memory-min-bounds")
+	} else {
+		f.bulkBoundsCheck(dst, n, memoryIndex)
+	}
 	avoid := maskOf(dst)
 	if pat != regNone {
 		avoid = avoid.add(pat)
@@ -2068,8 +2349,10 @@ func (f *fn) memoryFillConst(n int, memoryIndex uint32) {
 func (f *fn) memoryCopyConst(n int, dstMemory, srcMemory uint32) {
 	f.materializePendingLoads()
 	f.erase(f.s.back()) // n (const)
+	srcMinimum := f.minimumMemoryAccess(srcMemory, 0, n)
 	src, srcOwned := f.materializeRead(f.popValue())
 	f.pinned = f.pinned.add(src)
+	dstMinimum := f.minimumMemoryAccess(dstMemory, 0, n)
 	dst, dstOwned := f.materializeRead(f.popValue())
 	f.pinned = f.pinned.add(dst)
 	if !f.memoryAddr64(dstMemory) {
@@ -2078,12 +2361,25 @@ func (f *fn) memoryCopyConst(n int, dstMemory, srcMemory uint32) {
 	if !f.memoryAddr64(srcMemory) {
 		f.a.MovReg32(src, src)
 	}
-	f.bulkBoundsCheck(dst, n, dstMemory)
-	f.bulkBoundsCheck(src, n, srcMemory)
+	// The immutable declarations can prove either complete range independently.
+	// Zero-length and unbounded addresses retain their required checks.
+	if dstMinimum {
+		f.stats.peep("memory-min-bounds")
+	} else {
+		f.bulkBoundsCheck(dst, n, dstMemory)
+	}
+	if srcMinimum {
+		f.stats.peep("memory-min-bounds")
+	} else {
+		f.bulkBoundsCheck(src, n, srcMemory)
+	}
 	avoid := maskOf(src, dst)
 	srcBase, srcBaseOwned := f.indexedMemoryBase(srcMemory, avoid)
 	avoid = avoid.add(srcBase)
-	dstBase, dstBaseOwned := f.indexedMemoryBase(dstMemory, avoid)
+	dstBase, dstBaseOwned := srcBase, false
+	if dstMemory != srcMemory {
+		dstBase, dstBaseOwned = f.indexedMemoryBase(dstMemory, avoid)
+	}
 	avoid = avoid.add(dstBase)
 	var chunkBuf [8][2]int
 	chunks := bulkChunks(n, &chunkBuf)
@@ -2113,4 +2409,13 @@ func (f *fn) memoryCopyConst(n int, dstMemory, srcMemory uint32) {
 	if dstOwned {
 		f.release(dst)
 	}
+}
+
+// memoryShared selects the live shared extent instead of an instance directory snapshot.
+func (f *fn) memoryShared(memoryIndex uint32) bool {
+	if memoryIndex == 0 {
+		return f.threadedMemory0
+	}
+	mt, ok := f.memoryType(memoryIndex)
+	return ok && mt.Shared
 }

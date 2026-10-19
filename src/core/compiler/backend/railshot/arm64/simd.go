@@ -1082,13 +1082,13 @@ func (f *fn) i64x2MulInto(dst Reg) {
 	bLo := f.allocFReg(maskOf(xa, xb, t, aLo))
 	f.a.NeonXtnSfromD(aLo, xa) // last use of xa
 	f.a.NeonXtnSfromD(bLo, xb) // last use of xb
-	lo := f.allocFReg(maskOf(xa, xb, t, aLo, bLo))
-	f.a.NeonUmullDfromS(lo, aLo, bLo) // lo = aLo·bLo widened per 64-bit lane
+	// UMULL reads both low halves before writing its destination. Reuse aLo
+	// after that last input read so pinned vector kernels need one less scratch.
+	f.a.NeonUmullDfromS(aLo, aLo, bLo) // aLo = widened low product
 	f.releaseF(bLo)
-	f.releaseF(aLo)
 	f.fpinned = f.fpinned.remove(t)
-	f.a.NeonAddD(dst, t, lo) // dst written last; reads only t and lo
-	f.releaseF(lo)
+	f.a.NeonAddD(dst, t, aLo) // dst written last; reads only t and aLo
+	f.releaseF(aLo)
 	f.releaseF(t)
 
 	f.fpinned = f.fpinned.remove(xa).remove(xb)
@@ -1879,6 +1879,10 @@ func (f *fn) v128Load(r *wasm.Reader) error {
 	if err != nil {
 		return err
 	}
+	if handled, err := f.trySIMDLoadExtract(r, memoryIndex, off); handled || err != nil {
+		return err
+	}
+
 	base, ea, releaseBase, eaOwned, _, disp := f.memAddrAt(memoryIndex, off, 16)
 	x := f.allocFReg(0)
 	f.a.LdrQIdx(x, base, ea, disp)
@@ -2007,25 +2011,30 @@ func (f *fn) v128Store(r *wasm.Reader) error {
 	x := f.materializeV128(v)
 	f.fpinned = f.fpinned.add(x)
 	addrLocal, addrOK := localAddressKey(f.s.back())
-	if memoryIndex != 0 {
+	if memoryIndex != 0 || f.threadedMemory0 {
 		f.materializePendingLoads()
 	}
+	load, reuseAddress := f.inspectSIMDStoreLoadAddress(r, memoryIndex, off)
 	base, ea, releaseBase, eaOwned, _, disp := f.memAddrAt(memoryIndex, off, 16)
 	f.pinned = f.pinned.add(ea)
-	if memoryIndex == 0 {
+	if memoryIndex == 0 && !f.threadedMemory0 {
 		f.materializePendingLoadsBeforeStore(ea, addrLocal, addrOK, disp, 16)
 	}
 	f.a.StrQIdx(base, ea, x, disp)
-	f.pinned = f.pinned.remove(ea)
 	f.fpinned = f.fpinned.remove(x)
+	f.releaseF(x)
+	var loadErr error
+	if reuseAddress {
+		loadErr = f.emitSIMDStoreLoadAddress(r, load, base, ea, disp)
+	}
+	f.pinned = f.pinned.remove(ea)
 	if releaseBase {
 		f.release(base)
 	}
 	if eaOwned {
 		f.release(ea)
 	}
-	f.releaseF(x)
-	return nil
+	return loadErr
 }
 
 func simdLaneMemSize(sub uint32) int {
@@ -2097,12 +2106,12 @@ func (f *fn) v128StoreLane(r *wasm.Reader, sub uint32) error {
 	x := f.materializeV128(v)
 	f.fpinned = f.fpinned.add(x)
 	addrLocal, addrOK := localAddressKey(f.s.back())
-	if memoryIndex != 0 {
+	if memoryIndex != 0 || f.threadedMemory0 {
 		f.materializePendingLoads()
 	}
 	base, ea, releaseBase, eaOwned, _, disp := f.memAddrAt(memoryIndex, off, size)
 	f.pinned = f.pinned.add(ea)
-	if memoryIndex == 0 {
+	if memoryIndex == 0 && !f.threadedMemory0 {
 		f.materializePendingLoadsBeforeStore(ea, addrLocal, addrOK, disp, size)
 	}
 	t := f.allocReg(maskOf(base, ea))

@@ -210,8 +210,8 @@ func TestCodegenStatsSelectLocalTeeArm64(t *testing.T) {
 }
 
 func TestCodegenStatsStoreAndBoundsArm64(t *testing.T) {
-	body := []byte{0x00, 0x41, 0x10, 0x41, 0x2a, 0x36, 0x02, 0x00, 0x0b}
-	m := modMem(t, 1, nil, nil, body)
+	body := []byte{0x00, 0x20, 0x00, 0x41, 0x2a, 0x36, 0x02, 0x00, 0x0b}
+	m := modMem(t, 1, []wasm.ValType{wasm.I32}, nil, body)
 
 	explicit := compileWithStats(t, m, false).Funcs[0]
 	if explicit.Peephole["store-imm"] != 1 {
@@ -220,10 +220,13 @@ func TestCodegenStatsStoreAndBoundsArm64(t *testing.T) {
 	if explicit.BoundsChecks != 1 {
 		t.Errorf("explicit BoundsChecks = %d, want 1", explicit.BoundsChecks)
 	}
-	if explicit.TrapStubs < 1 {
-		t.Errorf("explicit TrapStubs = %d, want >=1", explicit.TrapStubs)
+	if explicit.TrapStubs != 1 {
+		t.Errorf("explicit TrapStubs = %d, want 1", explicit.TrapStubs)
 	}
 
+	if explicit.Peephole["memory-min-bounds"] != 0 {
+		t.Error("dynamic address incorrectly received a declared-minimum proof")
+	}
 	guard := compileWithStats(t, m, true).Funcs[0]
 	if guard.Peephole["store-imm"] != 1 {
 		t.Errorf("guard store-imm = %d, want 1", guard.Peephole["store-imm"])

@@ -10,10 +10,22 @@ import (
 // The binding inventory is checked against the arm64 Optimization Definitions
 // during package initialization. Public sense is always "on = enabled".
 var optimizationBindings = optimization.NewBindings("arm64",
+	optimization.Bind("atomic-wait-zero-timeout", &atomicZeroWaitEnabled),
+	optimization.Bind("atomic-notify-empty", &atomicNotifyEmptyEnabled),
+	optimization.Bind("memory-min-bounds", &memoryMinimumBoundsEnabled),
+	optimization.Bind("atomic-static-bounds", &atomicStaticBoundsEnabled),
+	optimization.Bind("shared-memory-base", &sharedMemoryBaseEnabled),
+	optimization.Bind("atomic-lse", &atomicLSEEnabled),
 	optimization.Bind("bounds-facts", &boundsFactsEnabled),
 	optimization.Bind("simd-superopt", &simdSuperoptEnabled),
+	optimization.Bind("simd-load-extract", &simdLoadExtractEnabled),
+	optimization.Bind("simd-store-load-address", &simdStoreLoadAddressEnabled),
+	optimization.Bind("bulk-fill-vector", &bulkFillVectorEnabled),
+	optimization.Bind("straight-line-block", &straightLineBlockEnabled),
 	optimization.Bind("interval-region-pins", &intervalRegionPinsEnabled),
 	optimization.Bind("interval-next-use", &intervalNextUseEnabled),
+	optimization.Bind("regional-memory-read", &regionalMemoryReadEnabled),
+	optimization.Bind("interval-call-regions", &intervalCallRegionsEnabled),
 	optimization.Bind("linear-sum-loop", &linearSumLoopEnabled),
 	optimization.Bind("multi-bounds-cert", &multiBoundsCertEnabled),
 	optimization.Bind("leaf-scratch-memsize", &leafScratchMemSizeEnabled),
@@ -24,7 +36,23 @@ var optimizationBindings = optimization.NewBindings("arm64",
 	optimization.Bind("native-leaf-host", &nativeLeafHostEnabled),
 	optimization.Bind("direct-go-host-import", &directGoImportEnabled),
 	optimization.Bind("loop-int-const", &loopIntConstEnabled),
+	optimization.Bind("scoped-loop-int-const", &scopedLoopConstsEnabled),
+	optimization.Bind("scoped-loop-float-const", &scopedLoopFloatConstsEnabled),
+	optimization.Bind("loop-memory-base", &loopMemoryBaseEnabled),
 	optimization.Bind("indexed-base-reuse", &indexedBaseReuseEnabled),
+	optimization.Bind("linear-integer-tree", &linearIntegerTreeEnabled),
+	optimization.Bind("dominated-indexed-base", &dominatedIndexedBaseEnabled),
+	optimization.Bind("dominated-indexed-key", &dominatedIndexedKeyEnabled),
+	optimization.Bind("ordinary-shifted-immediate", &ordinaryShiftedImmediateEnabled),
+	optimization.Bind("common-exit-compare", &commonExitCompareEnabled),
+	optimization.Bind("taken-zero-branch", &takenZeroBranchEnabled),
+	optimization.Bind("cset-lineage", &csetLineageEnabled),
+	optimization.Bind("guarded-boolean-xor", &guardedBooleanXorEnabled),
+	optimization.Bind("integer-select-local-read", &integerSelectLocalReadEnabled),
+	optimization.Bind("borrowed-div-rem", &borrowedDivRemEnabled),
+	optimization.Bind("bounded-signed-quotient", &boundedSignedQuotientEnabled),
+	optimization.Bind("br-table-branch-vector", &brTableBranchVectorEnabled),
+	optimization.Bind("bounded-branch-index", &boundedBranchIndexEnabled),
 	optimization.Bind("convert-read", &convertReadEnabled),
 	optimization.Bind("cold-call-local-pins", &coldCallLocalPinsEnabled),
 	optimization.Bind("magic-div", &magicDivEnabled),
@@ -42,6 +70,17 @@ var optimizationBindings = optimization.NewBindings("arm64",
 	optimization.Bind("memcopy-qpairs", &memcopyQPairsEnabled),
 	optimization.Bind("uxtw-add", &uxtwAddEnabled),
 	optimization.Bind("shifted-register-alu", &shiftedRegisterALUEnabled),
+	optimization.Bind("inverted-logical", &invertedLogicalEnabled),
+	optimization.Bind("select-group-guard", &selectGroupEnabled),
+	optimization.Bind("dot-loop-vector", &dotLoopEnabled),
+	optimization.Bind("pure-reduce-vector", &pureReduceEnabled),
+	optimization.Bind("wide-reuse-pins", &wideReusePinsEnabled),
+	optimization.Bind("guarded-test-ccmp", &guardedTestCCMPEnabled),
+	optimization.Bind("crowded-products", &crowdedProductsEnabled),
+	optimization.Bind("streaming-i32-reduction", &streamReduceEnabled),
+	optimization.Bind("single-negative-move32", &singleNegativeMove32Enabled),
+	optimization.Bind("select-source-read", &selectSourceReadEnabled),
+	optimization.Bind("select-sink-pure-guard", &selectSinkPureGuardEnabled),
 	optimization.Bind("fp-immediate-const", &fpImmediateConstEnabled),
 	optimization.Bind("fp-literal-pool", &floatLiteralPoolEnabled),
 	optimization.Bind("value-facts", &valueFactsEnabled),
@@ -75,10 +114,22 @@ var optimizationBindings = optimization.NewBindings("arm64",
 )
 
 var (
+	optMemoryMinimumBounds  = optimizationBindings.Option("memory-min-bounds")
+	optAtomicNotifyEmpty    = optimizationBindings.Option("atomic-notify-empty")
+	optAtomicStaticBounds   = optimizationBindings.Option("atomic-static-bounds")
+	optAtomicZeroWait       = optimizationBindings.Option("atomic-wait-zero-timeout")
+	optSharedMemoryBase     = optimizationBindings.Option("shared-memory-base")
+	optAtomicLSE            = optimizationBindings.Option("atomic-lse")
 	optBoundsFacts          = optimizationBindings.Option("bounds-facts")
+	optStraightLineBlock    = optimizationBindings.Option("straight-line-block")
+	optBulkFillVector       = optimizationBindings.Option("bulk-fill-vector")
+	optSIMDStoreLoadAddress = optimizationBindings.Option("simd-store-load-address")
+	optSIMDLoadExtract      = optimizationBindings.Option("simd-load-extract")
 	optSIMDSuperopt         = optimizationBindings.Option("simd-superopt")
 	optIntervalRegionPins   = optimizationBindings.Option("interval-region-pins")
 	optIntervalNextUse      = optimizationBindings.Option("interval-next-use")
+	optRegionalMemoryRead   = optimizationBindings.Option("regional-memory-read")
+	optIntervalCallRegions  = optimizationBindings.Option("interval-call-regions")
 	optLinearSumLoop        = optimizationBindings.Option("linear-sum-loop")
 	optMultiBoundsCert      = optimizationBindings.Option("multi-bounds-cert")
 	optLeafScratchMemSize   = optimizationBindings.Option("leaf-scratch-memsize")
@@ -89,7 +140,23 @@ var (
 	optNativeLeafHost       = optimizationBindings.Option("native-leaf-host")
 	optDirectGoHostImport   = optimizationBindings.Option("direct-go-host-import")
 	optLoopIntConst         = optimizationBindings.Option("loop-int-const")
+	optScopedLoopIntConst   = optimizationBindings.Option("scoped-loop-int-const")
+	optScopedLoopFloatConst = optimizationBindings.Option("scoped-loop-float-const")
+	optLoopMemoryBase       = optimizationBindings.Option("loop-memory-base")
+	optCommonExitCompare    = optimizationBindings.Option("common-exit-compare")
+	optTakenZeroBranch      = optimizationBindings.Option("taken-zero-branch")
+	optCsetLineage          = optimizationBindings.Option("cset-lineage")
+	optGuardedBooleanXor    = optimizationBindings.Option("guarded-boolean-xor")
+	optSelectLocalRead      = optimizationBindings.Option("integer-select-local-read")
+	optBorrowedDivRem       = optimizationBindings.Option("borrowed-div-rem")
+	optBoundedQuotient      = optimizationBindings.Option("bounded-signed-quotient")
+	optBrTableBranchVector  = optimizationBindings.Option("br-table-branch-vector")
+	optBoundedBranchIndex   = optimizationBindings.Option("bounded-branch-index")
+	optDominatedIndexedBase = optimizationBindings.Option("dominated-indexed-base")
+	optDominatedIndexedKey  = optimizationBindings.Option("dominated-indexed-key")
+	optOrdinaryShiftedImm   = optimizationBindings.Option("ordinary-shifted-immediate")
 	optIndexedBaseReuse     = optimizationBindings.Option("indexed-base-reuse")
+	optLinearIntegerTree    = optimizationBindings.Option("linear-integer-tree")
 	optConvertRead          = optimizationBindings.Option("convert-read")
 	optColdCallLocalPins    = optimizationBindings.Option("cold-call-local-pins")
 	optMagicDiv             = optimizationBindings.Option("magic-div")
@@ -106,6 +173,17 @@ var (
 	optMemcopyTail4         = optimizationBindings.Option("memcopy-tail4")
 	optMemcopyQPairs        = optimizationBindings.Option("memcopy-qpairs")
 	optUXTWAdd              = optimizationBindings.Option("uxtw-add")
+	optSelectGroupGuard     = optimizationBindings.Option("select-group-guard")
+	optDotLoopVector        = optimizationBindings.Option("dot-loop-vector")
+	optPureReduceVector     = optimizationBindings.Option("pure-reduce-vector")
+	optWideReusePins        = optimizationBindings.Option("wide-reuse-pins")
+	optGuardedTestCCMP      = optimizationBindings.Option("guarded-test-ccmp")
+	optCrowdedProducts      = optimizationBindings.Option("crowded-products")
+	optStreamReduce         = optimizationBindings.Option("streaming-i32-reduction")
+	optSingleNegativeMove32 = optimizationBindings.Option("single-negative-move32")
+	optSelectSourceRead     = optimizationBindings.Option("select-source-read")
+	optSelectSinkPureGuard  = optimizationBindings.Option("select-sink-pure-guard")
+	optInvertedLogical      = optimizationBindings.Option("inverted-logical")
 	optShiftedRegisterALU   = optimizationBindings.Option("shifted-register-alu")
 	optFPImmediateConst     = optimizationBindings.Option("fp-immediate-const")
 	optFPLiteralPool        = optimizationBindings.Option("fp-literal-pool")
