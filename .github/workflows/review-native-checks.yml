@@ -1,0 +1,118 @@
+name: Review native regression checks
+
+on:
+  push:
+    branches: [diagnostic/review-native-checks-20261019]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-native-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PR882_SOURCE: 780d68a2591931e0beec75eaa86286f95b01889d
+  PR881_SOURCE: e85afca6d7e9111c59aa98fed12e2e7889caac74
+
+jobs:
+  windows-fixtures:
+    name: Current Windows fixtures / host ${{ matrix.host }}
+    runs-on: windows-2025
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        host: [1, 2, 3, 4]
+    env:
+      GOGC: '20'
+      GOMAXPROCS: '2'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PR882_SOURCE }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Run repaired fixtures and checked backend
+        shell: pwsh
+        run: ./harness/tests/scripts/review-windows-fixtures.ps1 -SourceRoot ./source -EvidenceRoot ./review-evidence -ExpectedSource $env:PR882_SOURCE
+      - name: Save native host and test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: review-pr882-windows-host-${{ matrix.host }}
+          path: review-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+  arm64-join:
+    name: Current ARM64 join controls
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      GOMAXPROCS: '2'
+      WAGO_SHARED_SCALAR: '0'
+      WAGO_JOIN_NATIVE_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PR881_SOURCE }}
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Run native ARM64 controls and benchmark smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir review-evidence
+          test "$(uname -m)" = aarch64
+          test "$(go env GOHOSTARCH)" = arm64
+          test "$(go env GOARCH)" = arm64
+          test "$(git rev-parse HEAD)" = "$PR881_SOURCE"
+          {
+            uname -a
+            go version
+            go env GOOS GOARCH GOHOSTOS GOHOSTARCH
+            git rev-parse HEAD
+            sha256sum src/core/compiler/backend/railshot/arm64/integer_join_pressure_test.go
+          } > review-evidence/identity.txt
+          result=0
+          for tags in '' wago_regalloccheck wago_codegenstats; do
+            mode=${tags:-ordinary}
+            printf 'go test -v -count=1 -tags=%s -run=^Test(IntegerLiveAcrossJoin|JoinPressure) ./src/core/compiler/backend/railshot/arm64\n' "$tags" > "review-evidence/$mode.command"
+            set +e
+            go test -v -count=1 -tags="$tags" -run '^Test(IntegerLiveAcrossJoin|JoinPressure)' ./src/core/compiler/backend/railshot/arm64 > "review-evidence/$mode.stdout" 2> "review-evidence/$mode.stderr"
+            code=$?
+            set -e
+            printf '%s\n' "$code" > "review-evidence/$mode.exit"
+            if [ "$code" != 0 ]; then result=1; fi
+            if ! grep -q '^--- PASS: TestJoinPressureNativeEvidence ' "review-evidence/$mode.stdout"; then result=1; fi
+          done
+          printf '%s\n' "go test -run '^$' -bench '^BenchmarkIntegerLiveAcrossJoin$' -benchtime=1x -benchmem ./src/core/compiler/backend/railshot/arm64" > review-evidence/benchmark.command
+          set +e
+          go test -run '^$' -bench '^BenchmarkIntegerLiveAcrossJoin$' -benchtime=1x -benchmem ./src/core/compiler/backend/railshot/arm64 > review-evidence/benchmark.stdout 2> review-evidence/benchmark.stderr
+          code=$?
+          set -e
+          printf '%s\n' "$code" > review-evidence/benchmark.exit
+          if [ "$code" != 0 ]; then result=1; fi
+          printf '%s\n' "$result" > review-evidence/qualification.exit
+          exit "$result"
+      - name: Save native ARM64 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: review-pr881-native-arm64
+          path: review-evidence/
+          if-no-files-found: error
+          retention-days: 30
