@@ -8,6 +8,30 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Changed
 
+- Prepare native reservations only when the active backend has a matching
+  consumer, avoiding unused ARM64 live-struct and large-array batches. Retain
+  one reserved identity for proven-dead ARM64 scalar constructors.
+
+- Preserve invocation cancellation between reduced GC allocation batches and
+  slow per-object allocations.
+
+- Keep ordinary complete-loop and constructor/fill GC lowering, plus checked
+  helper-based dynamic array copies, in the lean TinyGo runtime to meet its
+  existing size budget.
+
+- Prepare one checked native identity for proven-dead GC batches on both
+  backends, avoiding unused live-object handle refills at collection.
+
+- Port checked GC induction reductions and prepared invocation paths to AMD64,
+  sharing allocation accounting and admission checks with ARM64.
+
+- Share sparse scans, occupied-block major collection, survivor-aware nursery
+  policies, zero-live recycling, and bounded native handle batches across
+  AMD64 and ARM64. Use exact local roots on both backends outside EH paths.
+
+- Unify ARM64 and AMD64 GC helper dispatch without overlapping helper IDs;
+  cached native GC artifacts require recompilation for ABI version 9.
+
 - Recycle zero-live AMD64 nursery identities in one batch while preserving
   cleanup for owned storage and exact-capacity free lists.
 
@@ -20,6 +44,11 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 - Require recompilation of cached native WasmGC artifacts after the native GC
   ABI update to version 8.
+
+- Accelerate ARM64 WasmGC scalar constructor reads, small numeric array
+  allocation and access, array fills, i31 round trips, and proven nonescaping
+  scalar-struct, uniform-array, and unsigned i31 induction sums. Preserve
+  allocation accounting, collection policies, and checked helper fallbacks.
 
 - Accelerate AMD64 WasmGC allocation, array operations, subtype casts, and
   i31 round trips with specialized generated paths, bounded native-handle

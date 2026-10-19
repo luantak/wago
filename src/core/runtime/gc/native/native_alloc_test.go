@@ -608,3 +608,57 @@ func TestNativeHandleBatchMatchesGeneralAllocator(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeReservationRefreshesDeadNurseryCycle(t *testing.T) {
+	desc, err := NewStructDesc(0, []StorageKind{StorageI32})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := NewCollector(Config{}, []TypeDesc{desc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.stats.MinorCollections = 1 << 32
+	c.stats.FullCollections = 3
+	c.stats.LiveObjects = 7
+	c.nativeView.setDeadNurseryCycle(0)
+	if !c.PrepareNativeStructAllocation(24) {
+		t.Fatal("reservation unavailable")
+	}
+	if c.nativeView.deadNurseryCycle() != (1<<32)+3 || c.stats.LiveObjects != 0 || c.nativeStructAlloc.Count == 0 {
+		t.Fatalf("new reservation retained stale accounting: cycle=%d pending=%d count=%d", c.nativeView.deadNurseryCycle(), c.stats.LiveObjects, c.nativeStructAlloc.Count)
+	}
+	c.stats.LiveObjects = 2
+	if !c.PrepareNativeStructAllocation(24) {
+		t.Fatal("active reservation unavailable")
+	}
+	c.CancelNativeAllocationBatch()
+	if !c.PrepareNativeStructAllocation(24) {
+		t.Fatal("replacement reservation unavailable")
+	}
+	if c.stats.LiveObjects != 2 {
+		t.Fatalf("same-cycle reservation lost %d pending charges", c.stats.LiveObjects)
+	}
+}
+
+func TestNativeLargeArrayReservationMatchesPhysicalExtent(t *testing.T) {
+	c, err := NewCollector(Config{ThroughputHeapBytes: 256 << 10, ThroughputPageBytes: 4096}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	for _, bytes := range []uint32{60 << 10, (60 << 10) - 8, 40 << 10, (40 << 10) - 8, 60 << 10, 40 << 10} {
+		if !c.PrepareNativeArrayAllocationImmediate(bytes) {
+			t.Fatalf("prepare %d", bytes)
+		}
+		s := c.nativeLargeArrayAlloc
+		if got := s.ChunkEnd - s.ChunkCursor; got != Align16(bytes) {
+			t.Fatalf("reservation extent = %d, want %d", got, Align16(bytes))
+		}
+	}
+	c.discardNativeLargeArrayAllocation()
+	if _, err := c.throughput.alloc(200<<10, spaceLarge); err != nil {
+		t.Fatalf("canceled reservations leaked: %v", err)
+	}
+}

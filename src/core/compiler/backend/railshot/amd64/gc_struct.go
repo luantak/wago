@@ -33,6 +33,8 @@ const (
 	gcFuncRefTest                    = 14
 	gcStructReserveDead              = 15
 	gcStructReserveDeadNative        = 40 // dead reservation followed by native batch preparation
+	gcStructReserveDeadBatch         = 42
+	gcArrayReserveDeadBatch          = 43
 )
 
 func (f *fn) emitFB(r *wasm.Reader) error {
@@ -139,30 +141,19 @@ func (f *fn) emitFB(r *wasm.Reader) error {
 		if err := f.callGCStructHelper(gcStructAllocOne, params, []wasm.ValType{result}); err != nil {
 			return err
 		}
-		if scalarReplacement && f.nativeStructDirectUsed && forward.kind == stLocalRef {
-			if reg, _, pinned := f.pinReg(int(forward.idx)); pinned {
-				forward.kind = stLocalReg
-				forward.reg = reg
-			}
-		}
+
 		f.markTopGCReference()
 		if selectionOK {
 			f.dropValue()
 			for _, value := range selection {
-				if value.kind == stLocalRef {
-					if reg, _, pinned := f.pinReg(int(value.idx)); pinned {
-						f.recoverLocal(int(value.idx))
-						value.kind, value.reg = stLocalReg, reg
-					}
-				}
-				f.pushValue(value)
+				f.pushGCForwardedValue(value)
 			}
 			f.emitSelect()
 			*r = selectionReader
 			f.stats.peep("gc-constructor-if-scalar-replace")
 		} else if forwardOK {
 			f.dropValue()
-			f.pushValue(forward)
+			f.pushGCForwardedValue(forward)
 			*r = forwardReader
 			if scalarReplacement {
 				f.stats.peep("gc-constructor-scalar-replace")
@@ -433,7 +424,7 @@ func (f *fn) tryForwardGCFreshStructGet(typeIndex, fieldIndex uint32) bool {
 		return false
 	}
 	f.dropValue()
-	f.pushValue(fact.value)
+	f.pushGCForwardedValue(fact.value)
 	f.invalidateGCFreshStructFact()
 	f.stats.peep("gc-fresh-struct-get-forward")
 	return true
@@ -1200,7 +1191,7 @@ func (f *fn) gcFrameLocal(index int) bool {
 
 func gcHelperMayAllocate(helper uint32) bool {
 	switch helper {
-	case gcStructAllocDefault, gcStructAllocOne, gcStructReserveDead, gcStructReserveDeadNative,
+	case gcStructAllocDefault, gcStructAllocOne, gcStructReserveDead, gcStructReserveDeadNative, gcStructReserveDeadBatch, gcArrayReserveDeadBatch,
 		gcArrayAllocDefault, gcArrayAllocFixed, gcArrayAllocUniform,
 		gcArrayAllocData, gcArrayAllocElem, gcArrayAllocFixedV128Spill,
 		gcArrayAllocDefaultNative, gcArrayAllocUniformNative, gcArrayAllocFixedNative,
@@ -1247,4 +1238,19 @@ func stagedStructField(m *wasm.Module, typeIndex, fieldIndex uint32) (wasm.Field
 		return wasm.FieldType{}, false
 	}
 	return sub.Comp.Fields[fieldIndex], true
+}
+
+// Forwarded local reads occur after allocation, which may either preserve dirty
+// pins or spill them through a helper. Recover from the current local state.
+func (f *fn) pushGCForwardedValue(value storage) {
+	if value.kind == stLocalRef {
+		x := int(value.idx)
+		if reg, _, pinned := f.pinReg(x); pinned {
+			f.recoverLocal(x)
+			value.kind, value.reg = stLocalReg, reg
+		} else if f.localConstZero(x) {
+			value = zeroStorage(value.typ)
+		}
+	}
+	f.pushValue(value)
 }
