@@ -54,8 +54,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   i31 round trips with specialized generated paths, bounded native-handle
   batches, and survivor-aware nursery management. Preserve the existing Go
   fallbacks and collector safety checks.
-- Return from AMD64 atomic wait mismatches, dynamic zero timeouts, and empty
-  notify calls before the Go-call argument setup; inline zero-count notify.
+
+- Return from AMD64 and ARM64 atomic wait mismatches, dynamic zero timeouts,
+  and empty notify calls before the Go-call argument setup; inline zero-count
+  notify.
 
 ## [v0.1.0-beta.13] - 2026-10-15
 

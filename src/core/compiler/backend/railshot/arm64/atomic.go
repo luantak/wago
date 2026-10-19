@@ -38,6 +38,12 @@ func (f *fn) emitFE(r *wasm.Reader) error {
 }
 
 func (f *fn) atomicWaitHelper(d railshared.Atomic) error {
+	if d.Class == railshared.AtomicNotify && f.opt(optAtomicNotifyEmpty) && d.MemoryIndex == 0 && f.threadedMemory0 && !f.memoryAddr64(0) {
+		top := f.s.back()
+		if top.elemKind() == ekValue && top.st.kind == stConst && top.st.cval == 0 {
+			return f.atomicZeroNotify(d)
+		}
+	}
 	if d.Class == railshared.AtomicWait && f.opt(optAtomicZeroWait) {
 		mt, ok := f.memoryType(d.MemoryIndex)
 		top := f.s.back()

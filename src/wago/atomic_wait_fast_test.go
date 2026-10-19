@@ -1,4 +1,4 @@
-//go:build (linux || darwin) && amd64 && !tinygo
+//go:build (linux || darwin) && (amd64 || arm64) && !tinygo
 
 package wago
 
@@ -195,6 +195,26 @@ func TestAtomicWaitFastNotifyWakesQueuedWaiter(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { _, err := m.wait32(ctx, 0, 0, -1); done <- err }()
 	waitForMemoryWaiters(t, m, 1)
+	// Neither dynamic nor literal zero-count notify may consume a queued waiter.
+	for _, zero := range []bool{false, true} {
+		zc, err := Compile(config, atomicWaitProbeModule(0, zero, 0))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer zc.Close()
+		zi, err := Instantiate(zc, testImports("env.memory", m))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer zi.Close()
+		out, err := zi.Invoke("run", 0, 0, 0)
+		if err != nil || len(out) != 1 || out[0] != 0 {
+			t.Fatalf("zero-count notify (literal=%t) = %v, %v", zero, out, err)
+		}
+		if m.jm.SharedNotifyPending() != 1 {
+			t.Fatal("zero-count notify consumed pending waiter state")
+		}
+	}
 	out, err := in.Invoke("run", 0, 1, 0)
 	if err != nil || len(out) != 1 || out[0] != 1 {
 		t.Fatalf("notify = %v, %v; want one wake", out, err)
