@@ -6,6 +6,11 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve deferred load addresses derived from pinned mutable globals on
+  AMD64, including Go-style exported function stack wrappers.
+
 ### Changed
 
 - Prepare native reservations only when the active backend has a matching
