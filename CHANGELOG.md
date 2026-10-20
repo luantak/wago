@@ -60,6 +60,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   batches, and survivor-aware nursery management. Preserve the existing Go
   fallbacks and collector safety checks.
 
+- Return from AMD64 and ARM64 atomic wait mismatches and empty notify calls
+  before the Go-call argument setup. Preserve memory ordering for zero-count
+  notify and keep matching dynamic waits on the synchronized helper path.
+
 ## [v0.1.0-beta.13] - 2026-10-15
 
 ### Changed
