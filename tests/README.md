@@ -1,5 +1,7 @@
 # Tests
 
+The [integer loop pressure profile](integer-loop-pressure.md) checks independent
+state values and bounded repeated execution on AMD64.
 The [integer conditional-join pressure profile](integer-join-pressure.md) checks
 computed values, branch outcomes, and bounded native placement on Linux AMD64
 and ARM64.
