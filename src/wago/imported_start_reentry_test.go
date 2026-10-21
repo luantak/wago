@@ -88,7 +88,8 @@ func TestImportedStartCanInvokeAnotherInstance(t *testing.T) {
 }
 
 func TestImportedStartCanReenterInitializingInstance(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Reentry does not require cancellation support from TinyGo's scheduler.
+	ctx, cancel := invocationContextTestParent(context.Background(), time.Now().Add(2*time.Second))
 	defer cancel()
 	bytes := wasmtest.Module(
 		wasmtest.Section(1, wasmtest.Vec(wasmtest.FuncType(nil, nil), wasmtest.FuncType(nil, []wasm.ValType{wasm.I32}))),
