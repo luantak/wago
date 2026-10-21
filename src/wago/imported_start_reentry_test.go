@@ -123,3 +123,51 @@ func TestImportedStartCanReenterInitializingInstance(t *testing.T) {
 		t.Fatalf("start callbacks = %d, want 1", calls)
 	}
 }
+
+func TestImportedStartInvocationContextParentCancellation(t *testing.T) {
+	if !nativeCancellationSupported() {
+		t.Skip("parent cancellation requires a concurrent scheduler")
+	}
+	state := &invocationContextTestState{concrete: true}
+	rt := newInvocationContextTestRuntime(t, state)
+	defer rt.Close()
+	module, err := rt.Compile(invocationContextImportedStartModule())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer module.Close()
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var retained HostModule
+	var callbackContext context.Context
+	state.outer = func(caller HostModule, _, _ []uint64) {
+		retained = caller
+		var err error
+		callbackContext, err = state.resolver.InvocationContext(caller)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cancel()
+		select {
+		case <-callbackContext.Done():
+			if callbackContext.Err() != context.Canceled {
+				t.Errorf("callback context = %v, want context.Canceled", callbackContext.Err())
+			}
+		case <-time.After(5 * time.Second):
+			t.Error("parent cancellation did not reach the active imported-start callback")
+		}
+	}
+	in, err := rt.Instantiate(parent, module)
+	if in != nil {
+		defer in.Close()
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Instantiate error = %v, want context.Canceled", err)
+	}
+	if callbackContext == nil || callbackContext.Err() != context.Canceled {
+		t.Fatalf("callback context after start = %v, want canceled", callbackContext)
+	}
+	if _, err := state.resolver.InvocationContext(retained); !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("expired start caller context = %v, want permission denied", err)
+	}
+}
