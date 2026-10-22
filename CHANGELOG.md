@@ -43,6 +43,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   in the common scalar store path and during second-input preparation in `fbin`
   and `fbinInto`.
 
+- Combine bounded ARM64 scalar shift and mask pairs with existing bitfield
+  encodings, including masks applied before an unsigned right shift.
 - Reuse ARM64 variable-shift source and count registers in ordinary scalar
   lowering.
 
