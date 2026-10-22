@@ -22,6 +22,10 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 - Preserve deferred load addresses derived from pinned mutable globals on
   AMD64, including Go-style exported function stack wrappers.
 
+- Give imported start callbacks an invocation identity and parent context so
+  authorized callbacks can initialize another instance through `InvokeFromHost`
+  and observe instantiation cancellation and deadlines.
+
 - Preserve deferred memory-load addresses when AMD64 binary operations write
   directly into a hinted register, fixing incorrect results in inlined C++
   wrappers with stack-based arguments.
