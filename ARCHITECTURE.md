@@ -760,6 +760,10 @@ AMD64 defined GC casts and tests accept equal canonical type IDs after checked
 object resolution. Unequal ordinary types use subtype intervals; unequal exact
 casts fail. See [identity measurements](docs/research/canonical-identity-shortcut.md).
 
+AMD64 final `v128` arrays use the scalar checked resolver and bounds path with
+16-byte SSE2 or AVX loads and stores. This access layout is separate from scalar
+fill and copy admission. See the
+[vector array measurements](docs/research/native-vector-array-access.md).
 Large-array reservations retain their nursery-list position in one private Go
 `int` at the end of `Collector`. Cancellation checks the saved index and handle
 identity before deleting that entry; if compaction moved or removed it, the
