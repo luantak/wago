@@ -8,6 +8,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Fixed
 
+- Mask narrow AMD64 plugin recipe results when a recipe returns its input
+  directly, preserving the declared logical bit width.
 - Keep the required atomic length read when an oversized memory64 shared grow
   request fails in the Go helper.
 
