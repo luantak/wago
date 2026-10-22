@@ -746,7 +746,8 @@ Every native-visible address must be stable for the duration in which native cod
 can consume it. Most runtime state is off-heap. Native GC ABI version 1 is the narrow
 exception: standard Go and the release TinyGo conservative collector are non-moving;
 typed Collector/Instance fields retain the view, heap/handle/card backing, fixed
-32-handle allocation state, epoch, nursery bump, and semantic counter. Production
+allocation state (up to 512 handles on AMD64 and 32 elsewhere), epoch, nursery
+bump, and semantic counter. Production
 code validates immutable view shape at artifact/collector/instantiation boundaries;
 `wagodebug` additionally revalidates it at each Go-to-native entry. Generated code
 reloads relocatable slice pointers after helper allocation, collection, or
@@ -754,7 +755,11 @@ card-backing refresh rather than caching them across safepoints. The only raw-ad
 reuse is a compiler-owned one-entry certificate within a mechanically safepoint-free
 straight-line region; every may-collect, host-reentry, control/EH, tail, local-write,
 or unknown edge invalidates it before lowering. Native allocation reserves identities
-only; collection cancels unused reservations before tracing.
+only; collection cancels unused reservations before tracing. Live-struct batches
+start at the configured maximum, shrink after low-use cancellation, and double
+after 32 consecutive full batches. Feedback belongs to each collector and excludes array chunks and
+one-handle dead-struct proofs. See the
+[batch cancellation measurements](docs/research/native-batch-cancellation.md).
 
 AMD64 defined GC casts and tests accept equal canonical type IDs after checked
 object resolution. Unequal ordinary types use subtype intervals; unequal exact
