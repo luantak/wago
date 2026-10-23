@@ -8,6 +8,8 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Fixed
 
+- Compile ARM64 memory operations at large valid directory indexes by forming
+  an encodable entry address before loading or updating its fields.
 - Compile large ARM64 functions whose conditional branches exceed 1 MiB by
   retrying with space for long branches. Fixes PDFium chromium/8111 compilation
   ([#1013](https://github.com/wago-org/wago/issues/1013)).
