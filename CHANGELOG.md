@@ -8,6 +8,9 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 
 ### Fixed
 
+- Compile large ARM64 functions whose conditional branches exceed 1 MiB by
+  retrying with space for long branches. Fixes PDFium chromium/8111 compilation
+  ([#1013](https://github.com/wago-org/wago/issues/1013)).
 - Mask narrow AMD64 plugin recipe results when a recipe returns its input
   directly, preserving the declared logical bit width.
 - Keep the required atomic length read when an oversized memory64 shared grow
