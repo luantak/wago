@@ -13,6 +13,9 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
 - Keep the required atomic length read when an oversized memory64 shared grow
   request fails in the Go helper.
 
+- Use an allocated scratch register for AMD64 prefix spill moves. Checked
+  builds no longer reject a temporary borrow of a live load-address register.
+
 - Allow up to 32 nested synchronous host calls under standard Go so component
   adapter chains can cross more than four boundaries. TinyGo retains its
   three-call limit for fixed host stacks. Size parked GC callback and root storage
@@ -66,6 +69,14 @@ with `v0.1.0-beta.8`; earlier prereleases remain available in the
   `wago_regalloccheck` is enabled. Also guard inputs during address preparation
   in the common scalar store path and during second-input preparation in `fbin`
   and `fbinInto`.
+- Simplify scalar floating self-comparisons with full-width booleans and no GP temporary.
+  Fuse ARM64 and Linux AMD64 scalar float comparisons into immediate branches and
+  integer selections, including boolean inversion, without materializing an intermediate
+  integer boolean.
+  Write ARM64 scalar abs/neg local assignments directly with native instructions,
+  and lower copysign to one sign mask plus bitwise select, preserving NaN payloads.
+  Write AMD64 scalar abs/neg/copysign local assignments directly, avoiding result
+  copies, and simplify copysign with identical inputs without altering signaling NaNs.
 
 - Combine bounded ARM64 scalar shift and mask pairs with existing bitfield
   encodings, including masks applied before an unsigned right shift.
